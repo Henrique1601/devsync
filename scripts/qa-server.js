@@ -10,3 +10,4 @@ await mkdir(directory,{recursive:true});
 await writeFile(path.join(directory,'urls.json'), JSON.stringify({local:`http://127.0.0.1:${local.port}/#${local.token}`,remote:`http://127.0.0.1:${remote.server.address().port}`}));
 console.log('Servidores de QA disponíveis em .qa/urls.json');
 const stop=async()=>{await local.stop();await remote.close();process.exit(0)};process.on('SIGINT',stop);process.on('SIGTERM',stop);
+process.stdin.setEncoding('utf8');process.stdin.on('data',value=>{if(value.trim()==='stop')void stop()});

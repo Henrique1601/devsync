@@ -1,21 +1,31 @@
-# Validação da versão 0.2
+# Validação da versão 0.3
 
-Data: 6 de outubro de 2026. Ambiente: Windows, Node.js 24.16.0, Electron 44.6.0.
+Data: 7 de outubro de 2026. Ambiente: Windows, Node.js 24.16.0, Electron 44.6.0.
 
 ## Verificado
 
-- Correção de bloqueio residual: três testes adicionais verificam proprietário ativo, recuperação de processo antigo encerrado e preservação de origem incerta. O teste de integração do daemon foi repetido com a correção e passou.
+- `node --test`: 36 testes aprovados, sem falhas ou testes ignorados. Incluem sincronização com remotos Git temporários, proteção de alterações, contagem de commits, checkpoints, regras e validação de entrada, diagnóstico, API/CLI, tokens, locks, coordenação remota e persistência.
+- Histórico sobrevive à reinicialização, limita registros, filtra por projeto e omite caminhos, conteúdo e tokens.
+- Checkpoints por lista de arquivos preservam alterações excluídas e arquivos novos no índice. Nomes literais Git e arquivos sensíveis têm regressões.
+- Revisão de segurança encontrou e corrigiu backtracking excessivo em padrões de arquivos e liberação antecipada do lock quando uma operação de histórico falhava. Testes verificam matcher adversarial limitado, espera pelos projetos restantes e ocupação até terminar o journal.
+- Atualizador testado sem rede/instaladores reais: fonte HTTPS, restrição de origem/pasta e redirecionamentos, cancelamento, checksum com falha, concorrência, download separado de instalação e parada do serviço antes de instalar. A sessão da biblioteca instalada foi conferida contra o bloqueio de requisições do Electron.
+- `npm audit --omit=dev`: nenhuma vulnerabilidade reportada nas dependências de produção.
+- Navegador com serviço e repositório temporários: diagnóstico pronto, cadastro, regras 45s/90s com dois padrões, histórico e filtro funcionaram; recarga preservou autenticação e regras. Tela Computador carregou. Console sem erros ou avisos. Em 390px, sem overflow horizontal; todos os campos tinham rótulos associados.
+- CLI real sobre a mesma configuração isolada: `settings`, `history` e `diagnose` responderam corretamente.
+- Desktop em código passou smoke isolado de serviço, bandeja e IPC, incluindo atualização.
+- `npm run dist`: instalador NSIS x64 `dist/DevSync Setup 0.3.0.exe`, `.blockmap` e `latest.yml` gerados. SHA-512 do instalador corresponde ao manifesto; tamanho 111.718.632 bytes.
+- Executável empacotado passou smoke com `desktopSmoke: passed`, `tray: true`, `ownedService: true`, `updateBridge: true`, `updatesSupported: true`, exit code 0. Encerramento removeu runtime e lock da configuração de teste.
+- Healthcheck remoto público expõe somente liveness; autenticação continua exigida para dispositivos. Testes cobrem Host preservado por proxy, Origin inválida, limite de corpo e resposta de saúde durante upload lento.
+- YAML de implantação validado e `docker compose config` aprovado com valores de teste. Docker Desktop estava sem engine Linux ativo; não foi possível construir/executar os containers neste computador.
 
-- Suíte Node com 16 testes de integração: sincronização Git, proteção de alterações locais, checkpoints optativos, clonagem sem rede pela API, autenticação e coordenação remota.
-- Desktop em configuração isolada: serviço local iniciou, bandeja foi criada e IPC da janela com preload isolado respondeu. Encerramento normal removeu o runtime/lock do serviço criado pelo desktop.
-- Navegador: painel local carregou; URL informada no cadastro de pasta exibiu instrução de usar a clonagem; recarga preservou a sessão autenticada; pareamento por token gerou dispositivo; o painel local e o remoto confirmaram estado conectado/online.
-- Teste de integração adicional com o daemon real conectado ao coordenador: heartbeat publicou os projetos, comando remoto retomou o projeto e a confirmação foi persistida na fila.
-- Instalador NSIS Windows x64 gerado em `dist/DevSync Setup 0.2.0.exe`.
-- Executável empacotado em `dist/win-unpacked/DevSync.exe` passou pelo mesmo smoke test: serviço, bandeja e IPC funcionaram, e o encerramento removeu runtime e lock da configuração isolada.
-- `npm audit --omit=dev`: nenhuma vulnerabilidade reportada nas dependências de produção. A cadeia de ferramentas de empacotamento reportou 8 alertas moderados transitivos relacionados a `sprintf-js`; nenhuma dessas dependências é incluída no app empacotado.
+![Histórico após salvar regras em projeto temporário](devsync-v03-history.png)
 
-## Limites da validação
+## Limites
 
-Não houve publicação em domínio HTTPS, instalação nos dois PCs do usuário, execução de clonagem com credenciais reais do GitHub, nem login/reinicialização do Windows para verificar a preferência de inicialização automática. O smoke test lê a preferência e não a altera. Notificações são configuradas para transições de estado; sua apresentação depende das permissões/configurações de notificações do Windows.
+Não houve publicação em domínio HTTPS ou servidor de versões: é necessário informar a hospedagem/conta do usuário. A implantação está preparada, mas não está online. Não houve atualização real por download HTTPS nem execução do instalador para substituir uma instalação anterior; o fluxo foi validado por testes de controlador e IPC do executável empacotado. O binário não possui assinatura de publicador.
 
-Não há baseline visual anterior para comparação, nem auditoria completa de acessibilidade ou métricas de desempenho web. O resultado não afirma cobertura desses aspectos.
+Não houve instalação nos dois PCs, autenticação real do GitHub, reinicialização/login do Windows para comprovar autostart, auditoria completa WCAG ou medição de desempenho. Os testes e smoke usam diretórios isolados sem modificar a configuração e os projetos reais do usuário.
+
+## Restauração e versionamento
+
+Antes das alterações, foi criado `.backups/devsync-before-v03-20261007-074558.zip` e registrado o commit inicial `cc397d6`, preservado na branch `backup/checkpoint-20261007-v02`. O ZIP não contém dependências nem instaladores. O projeto não possui remoto Git configurado; o código fica versionado localmente até o usuário indicar um repositório de destino.

@@ -27,6 +27,12 @@ export async function createCoordinator({ directory, adminToken, host = '127.0.0
   }
   let requests = Promise.resolve();
   const server = http.createServer((req, res) => {
+    // Health probes must not wait for an authenticated request reading its body.
+    // Never expose device data, tokens, paths or queue contents here.
+    if (req.method === 'GET' && req.url === '/api/health') {
+      res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' });
+      return res.end(JSON.stringify({ ok: true }));
+    }
     const handle = async () => {
       const reply = (status, value) => { res.writeHead(status, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(value)); };
       try {
@@ -36,15 +42,27 @@ export async function createCoordinator({ directory, adminToken, host = '127.0.0
         }
         if (req.url === '/favicon.ico') { res.writeHead(204); return res.end(); }
         // Reject browser cross-origin requests even when a token is available.
-        if (req.headers.origin && new URL(req.headers.origin).host !== req.headers.host) return reply(403, { error: 'Origem inválida.' });
+        if (req.headers.origin) {
+          let origin;
+          try { origin = new URL(req.headers.origin); } catch { return reply(403, { error: 'Origem inválida.' }); }
+          // Match the original Host preserved by the HTTPS proxy. Forwarded
+          // headers supplied by clients are deliberately not trusted.
+          if (!['http:', 'https:'].includes(origin.protocol) || origin.host !== req.headers.host || origin.username || origin.password) return reply(403, { error: 'Origem inválida.' });
+        }
         const supplied = req.headers.authorization?.replace(/^Bearer /, '');
         const admin = matches(supplied, adminToken);
         const device = data.devices.find(d => matches(supplied, d.token));
         if (!admin && !device) return reply(401, { error: 'Token inválido.' });
         if (req.method === 'GET' && req.url === '/api/devices' && admin) return reply(200, { devices: data.devices.map(({ token, ...d }) => ({ ...d, online: Boolean(d.lastSeen && Date.now() - Date.parse(d.lastSeen) < 35000) })), jobs: data.jobs });
         if (req.method !== 'POST') return reply(404, { error: 'Rota desconhecida.' });
-        let raw = '';
-        for await (const chunk of req) { raw += chunk; if (Buffer.byteLength(raw) > 262144) return reply(413, { error: 'Pedido grande demais.' }); }
+        const chunks = [];
+        let size = 0;
+        for await (const chunk of req.iterator({ destroyOnReturn: false })) {
+          size += chunk.length;
+          if (size > 262144) { req.resume(); return reply(413, { error: 'Pedido grande demais.' }); }
+          chunks.push(chunk);
+        }
+        const raw = Buffer.concat(chunks).toString('utf8');
         let body;
         try { body = JSON.parse(raw); } catch { return reply(400, { error: 'JSON inválido.' }); }
         if (!body || typeof body !== 'object' || Array.isArray(body)) return reply(400, { error: 'Parâmetros inválidos.' });
@@ -84,6 +102,7 @@ export async function createCoordinator({ directory, adminToken, host = '127.0.0
     const pending = requests.then(handle); requests = pending.catch(() => {});
   });
   server.requestTimeout = 20000;
+  server.headersTimeout = 15000;
   await new Promise((resolve, reject) => { server.once('error', reject); server.listen(port, host, resolve); });
   return { server, close: async () => { await new Promise(resolve => server.close(resolve)); await writes; } };
 }

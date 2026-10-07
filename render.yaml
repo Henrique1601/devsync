@@ -1,0 +1,25 @@
+# Requer plano pago e disco persistente. Aplique somente após revisar custos.
+services:
+  - type: web
+    name: devsync-coordinator
+    runtime: node
+    plan: 0.5c-512mb
+    numInstances: 1
+    buildCommand: npm ci --omit=dev
+    startCommand: DEVSYNC_COORDINATOR_PORT=$PORT node src/cli.js coordinator
+    healthCheckPath: /api/health
+    disk:
+      name: coordinator-data
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: NODE_ENV
+        value: production
+      - key: DEVSYNC_COORDINATOR_HOST
+        value: 0.0.0.0
+      - key: DEVSYNC_COORDINATOR_HOME
+        value: /var/data/devsync
+      - key: DEVSYNC_ADMIN_TOKEN
+        generateValue: true

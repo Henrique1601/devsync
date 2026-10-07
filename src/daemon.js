@@ -7,39 +7,62 @@ import { home, read, write } from './store.js';
 import { git, inspect, synchronize } from './git.js';
 import { startRemote, validateRemote } from './remote-client.js';
 import { acquireServiceLock } from './service-lock.js';
+import { rulesFor, validateRules, isSyncDue } from './rules.js';
+import { createHistory, historySnapshot, stateReasons } from './history.js';
+import { diagnose } from './onboarding.js';
+import { settleOperations, withBusy } from './operations.js';
 class CommandError extends Error {}
 export async function daemon() {
   await mkdir(home, { recursive: true, mode: 0o700 });
   const lock = await acquireServiceLock(home);
-  let server, timer, remote;
+  let server, timer, remote, signalStop;
+  let mutations = Promise.resolve();
+  let stopping = false;
   try {
     const config = await read('config.json', { projects: [] });
+    const history = await createHistory();
+    const lastRuns = new Map();
     const states = new Map();
     const busy = new Set();
     const token = randomBytes(32).toString('hex');
     const page = await readFile(fileURLToPath(new URL('../ui/index.html', import.meta.url)));
-    async function sync(repo) {
+    async function snapshot(repo) {
+      const status = await inspect(repo).catch(() => ({ state: 'error' }));
+      const head = await git(repo.path, 'rev-parse', '--verify', 'HEAD').catch(() => null);
+      return historySnapshot({ ...status, head });
+    }
+    async function sync(repo, source = 'automatic') {
       if (busy.has(repo.id)) return;
-      busy.add(repo.id);
-      try { states.set(repo.id, { ...await synchronize(repo), checkedAt: new Date().toISOString() }); }
-      catch (error) { states.set(repo.id, { state: 'error', message: error.message.startsWith('Checkpoint bloqueado:') ? error.message : 'Falha no Git: confira rede, credenciais, identidade de commit e upstream pelo terminal.', checkedAt: new Date().toISOString() }); }
-      finally { busy.delete(repo.id); }
+      return withBusy(busy, repo.id, async () => {
+      const startedAt = new Date().toISOString();
+      const before = await snapshot(repo);
+      try {
+        const result = await synchronize(repo);
+        states.set(repo.id, { ...result, reason: stateReasons[result.state], checkedAt: new Date().toISOString() });
+      }
+      catch (error) { states.set(repo.id, { ...error.activity, state: 'error', message: error.message.startsWith('Checkpoint bloqueado:') ? error.message : 'Falha no Git: confira rede, credenciais, identidade de commit e upstream pelo terminal.', checkedAt: new Date().toISOString() }); }
+      lastRuns.set(repo.id, Date.now());
+      const result = states.get(repo.id);
+      await history.append({ projectId: repo.id, projectName: repo.name, source, action: 'sync', startedAt, finishedAt: result.checkedAt,
+        ...result, reason: result.message || stateReasons[result.state], before, after: { ...await snapshot(repo), state: result.state } });
+      });
     }
     let ticking = false;
     async function tick() {
-      if (ticking) return;
+      if (ticking || stopping) return;
       ticking = true;
-      const pending = mutations.then(() => Promise.all(config.projects.map(sync)));
+      const pending = mutations.then(() => settleOperations(config.projects.filter(repo => isSyncDue(repo, lastRuns.get(repo.id))).map(repo => sync(repo))));
       mutations = pending.catch(() => {});
       try { await pending; } finally { ticking = false; }
     }
-    let mutations = Promise.resolve();
-    const projectStatus = () => config.projects.map(p => ({ ...p, ...(states.get(p.id) || { state: 'pending' }), busy: busy.has(p.id) }));
-    async function execute(data) {
-      const pending = mutations.then(() => perform(data)); mutations = pending.catch(() => {}); return pending;
+    const projectStatus = () => config.projects.map(p => ({ ...p, ...rulesFor(p), ...(states.get(p.id) || { state: 'pending' }), busy: busy.has(p.id) }));
+    async function execute(data, source = 'manual') {
+      if (stopping) throw new CommandError('O serviço está encerrando. Aguarde e abra o DevSync novamente.');
+      const pending = mutations.then(() => perform(data, source)); mutations = pending.catch(() => {}); return pending;
     }
-    async function perform(data) {
+    async function perform(data, source = 'manual') {
       if (!data || typeof data !== 'object' || Array.isArray(data)) throw new CommandError('Parâmetros do comando inválidos.');
+      if (data.command === 'diagnose') return diagnose(data.path);
       if (data.command === 'remote-config') {
         let settings;
         try { settings = validateRemote(data.settings); } catch (error) { throw new CommandError(error.message); }
@@ -55,9 +78,9 @@ export async function daemon() {
         const parent = await realpath(path.dirname(destination)).catch(() => { throw new CommandError('A pasta que receberá o clone não existe.'); });
         try { await git(parent, 'clone', '--', data.url, destination); }
         catch { throw new CommandError('Não foi possível clonar. Confira o repositório, rede e autenticação do Git. O clone parcial, se existir, foi preservado.'); }
-        return perform({ command: 'add', path: destination });
+        return perform({ command: 'add', path: destination }, source);
       }
-      if (!['add', 'sync', 'pause', 'resume', 'push-on', 'push-off', 'checkpoint-on', 'checkpoint-off'].includes(data.command)) throw new CommandError('Comando desconhecido.');
+      if (!['add', 'sync', 'pause', 'resume', 'push-on', 'push-off', 'checkpoint-on', 'checkpoint-off', 'settings'].includes(data.command)) throw new CommandError('Comando desconhecido.');
       if (data.command === 'add') {
         if (typeof data.path !== 'string' || !data.path.trim()) throw new CommandError('Informe o caminho da pasta do projeto.');
         const folder = data.path.trim().replace(/^"(.*)"$/, '$1');
@@ -70,31 +93,40 @@ export async function daemon() {
         if (config.projects.some(p => process.platform === 'win32' ? p.path.toLowerCase() === root.toLowerCase() : p.path === root)) throw new CommandError('Projeto já cadastrado.');
         try { branch = await git(root, 'symbolic-ref', '--quiet', '--short', 'HEAD'); }
         catch { throw new CommandError('O projeto está sem uma branch ativa (HEAD destacado). Selecione uma branch antes de cadastrar.'); }
-        const p = { id: randomBytes(6).toString('hex'), name: path.basename(root), path: root, branch, paused: false, autoPush: false, checkpoint: false };
+        const p = { id: randomBytes(6).toString('hex'), name: path.basename(root), path: root, branch, paused: false, autoPush: false, checkpoint: false, ...rulesFor({}) };
         try { await git(root, 'rev-parse', '--verify', 'HEAD'); }
         catch { throw new CommandError('O repositório ainda não tem commits. Crie o primeiro commit antes de cadastrar.'); }
         try { await git(root, 'rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{u}'); }
         catch { throw new CommandError(`A branch ${branch} não tem upstream configurado. Configure a branch remota de acompanhamento antes de cadastrar.`); }
         await inspect(p);
         await write('config.json', { ...config, projects: [...config.projects, p] });
-        config.projects.push(p); await sync(p); return { project: p };
+        config.projects.push(p); await sync(p, 'registration'); return { project: p };
       }
       const repo = config.projects.find(p => p.id === data.id || p.name === data.id);
       if (!repo) throw new CommandError('Projeto não encontrado. Use o ID exibido em status.');
       if (data.command === 'sync') {
         if (busy.has(repo.id)) throw new CommandError('Projeto já está sincronizando. Aguarde a operação terminar.');
-        await sync(repo); return states.get(repo.id);
+        await sync(repo, source); return states.get(repo.id);
       }
       if (busy.has(repo.id)) throw new CommandError('Aguarde a sincronização terminar antes de mudar as regras.');
       const changes = { pause: { paused: true }, resume: { paused: false }, 'push-on': { autoPush: true }, 'push-off': { autoPush: false }, 'checkpoint-on': { checkpoint: true }, 'checkpoint-off': { checkpoint: false } };
-      const updated = { ...repo, ...changes[data.command] };
+      let settings = {};
+      if (data.command === 'settings') {
+        try { settings = validateRules(data); } catch (error) { throw new CommandError(error.message); }
+        if (!Object.keys(settings).length) throw new CommandError('Informe pelo menos uma regra de sincronização.');
+      }
+      const updated = { ...repo, ...rulesFor(repo), ...changes[data.command], ...settings };
       const projects = config.projects.map(p => p.id === repo.id ? updated : p);
       await write('config.json', { ...config, projects }); config.projects = projects;
+      const now = new Date().toISOString();
+      const current = await snapshot(updated);
+      await history.append({ projectId: repo.id, projectName: repo.name, source, action: data.command, startedAt: now, finishedAt: now,
+        state: updated.paused ? 'paused' : current.state, reason: 'Regras do projeto atualizadas pelo usuário.', before: current, after: current });
       return { project: updated };
     }
     remote = startRemote(() => config.remote, projectStatus, async data => {
       if (!['sync', 'pause', 'resume'].includes(data.command)) throw new CommandError('Comando remoto não permitido.');
-      return execute(data);
+      return execute(data, 'remote');
     });
     server = http.createServer(async (req, res) => {
       const json = (code, value) => { res.writeHead(code, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(value)); };
@@ -102,12 +134,23 @@ export async function daemon() {
         const authority = `127.0.0.1:${server.address().port}`;
         if (req.headers.host !== authority || (req.headers.origin && req.headers.origin !== `http://${authority}`)) return json(403, { error: 'Origem inválida.' });
         if (req.method === 'GET' && req.url === '/') {
-          res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Frame-Options': 'DENY', 'Referrer-Policy': 'no-referrer', 'Content-Security-Policy': "default-src 'self'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'; frame-ancestors 'none'" });
+          res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Frame-Options': 'DENY', 'Referrer-Policy': 'no-referrer', 'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; frame-ancestors 'none'" });
           return res.end(page);
         }
         if (req.method === 'GET' && req.url === '/favicon.ico') { res.writeHead(204); return res.end(); }
+        if (req.method === 'GET' && ['/assets/local.js', '/assets/local.css'].includes(req.url)) {
+          const name = req.url.endsWith('.js') ? 'local.js' : 'local.css';
+          const content = await readFile(fileURLToPath(new URL(`../ui/${name}`, import.meta.url)));
+          res.writeHead(200, { 'Content-Type': name.endsWith('.js') ? 'application/javascript; charset=utf-8' : 'text/css; charset=utf-8', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' });
+          return res.end(content);
+        }
         if (req.headers.authorization !== `Bearer ${token}`) return json(401, { error: 'Token inválido.' });
         if (req.method === 'GET' && req.url === '/api/status') return json(200, { projects: projectStatus(), remote: { ...remote.status(), ...(config.remote ? { url: config.remote.url, name: config.remote.name, deviceId: config.remote.deviceId } : {}) } });
+        if (req.method === 'GET' && new URL(req.url, `http://${authority}`).pathname === '/api/history') {
+          const query = new URL(req.url, `http://${authority}`).searchParams;
+          try { return json(200, history.query({ projectId: query.get('projectId') || undefined, limit: query.has('limit') ? Number(query.get('limit')) : 100 })); }
+          catch (error) { throw new CommandError(error.message); }
+        }
         if (req.method !== 'POST' || req.url !== '/api/command') return json(404, { error: 'Rota desconhecida.' });
         let raw = '';
         for await (const chunk of req) { raw += chunk; if (Buffer.byteLength(raw) > 8192) return json(413, { error: 'Pedido grande demais.' }); }
@@ -123,8 +166,7 @@ export async function daemon() {
     const port = server.address().port;
     await write('runtime.json', { port, token, pid: process.pid });
     console.log(`Painel local: http://127.0.0.1:${port}/#${token}`);
-    timer = setInterval(tick, 30000);
-    let stopping = false;
+    timer = setInterval(() => tick().catch(() => console.error('Não foi possível concluir a verificação ou gravar o histórico.')), 1000);
     async function stop() {
       if (stopping) return; stopping = true;
       clearInterval(timer);
@@ -136,6 +178,7 @@ export async function daemon() {
       await rm(lock, { recursive: true, force: true });
       process.exit(0);
     }
+    signalStop = stop;
     process.on('SIGINT', stop); process.on('SIGTERM', stop);
     await tick(); await remote.poll();
     return { port, token, stop: async () => {
@@ -147,6 +190,11 @@ export async function daemon() {
       await rm(path.join(home, 'runtime.json'), { force: true }); await rm(lock, { recursive: true, force: true });
     } };
   } catch (e) {
-    clearInterval(timer); await remote?.stop(); server?.close(); await rm(lock, { recursive: true, force: true }); throw e;
+    stopping = true;
+    clearInterval(timer); await remote?.stop(); server?.close();
+    await mutations;
+    if (signalStop) { process.removeListener('SIGINT', signalStop); process.removeListener('SIGTERM', signalStop); }
+    await rm(path.join(home, 'runtime.json'), { force: true });
+    await rm(lock, { recursive: true, force: true }); throw e;
   }
 }

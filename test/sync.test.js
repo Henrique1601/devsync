@@ -8,6 +8,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { git, synchronize } from '../src/git.js';
 import { createCoordinator } from '../src/coordinator.js';
+import { diagnose } from '../src/onboarding.js';
 async function fixture(t) {
   const root = await mkdtemp(path.join(os.tmpdir(), 'devsync-test-'));
   t.after(() => rm(root, { recursive:true, force:true }));
@@ -49,6 +50,33 @@ test('checkpoint blocks sensitive tracked files and waits for quiet time',async 
   await writeFile(path.join(f.b,'.env'),'SECRET=old');await git(f.b,'add','.env');await git(f.b,'commit','-m','fixture');await writeFile(path.join(f.b,'.env'),'SECRET=new');
   const before=await git(f.b,'rev-parse','HEAD');await assert.rejects(synchronize({...f.repo,checkpoint:true,checkpointDelayMs:0}),/arquivo sensível/);assert.equal(await git(f.b,'rev-parse','HEAD'),before);
 });
+
+test('checkpoint allowlist excludes unrelated staged and untracked files',async t=>{
+  const f=await fixture(t);
+  await writeFile(path.join(f.b,'other.txt'),'base');await git(f.b,'add','other.txt');await git(f.b,'commit','-m','setup');
+  await writeFile(path.join(f.b,'hello.txt'),'allowed');await writeFile(path.join(f.b,'other.txt'),'staged');await git(f.b,'add','other.txt');
+  await writeFile(path.join(f.b,'draft.txt'),'untracked');await git(f.b,'add','draft.txt');
+  await synchronize({...f.repo,checkpoint:true,checkpointDelayMs:0,checkpointInclude:['hello.txt']});
+  assert.equal(await git(f.b,'show','HEAD:hello.txt'),'allowed');assert.equal(await git(f.b,'show','HEAD:other.txt'),'base');
+  assert.match(await git(f.b,'diff','--cached','--name-only'),/other.txt/);assert.match(await git(f.b,'diff','--cached','--name-only'),/draft.txt/);
+  await assert.rejects(git(f.b,'show','HEAD:draft.txt'));
+});
+
+test('sync reports received and sent commit counts',async t=>{
+  const f=await fixture(t);await f.commit(f.a,'received');await git(f.a,'push');
+  const received=await synchronize(f.repo);assert.equal(received.receivedCommits,1);assert.equal(received.sentCommits,0);
+  await f.commit(f.b,'sent');const sent=await synchronize({...f.repo,autoPush:true});assert.equal(sent.sentCommits,1);
+});
+
+test('onboarding reports missing upstream, identity and detached HEAD without modifying Git',async t=>{
+  const f=await fixture(t), before=await git(f.b,'rev-parse','HEAD');
+  await git(f.b,'branch','--unset-upstream');await git(f.b,'config','user.name','');
+  const missing=await diagnose(f.b);assert.equal(missing.ready,false);assert.equal(missing.upstream,null);assert.equal(missing.identity.nameConfigured,false);
+  assert.ok(missing.checks.find(check=>check.id==='upstream').guidance.includes('--set-upstream-to'));
+  await git(f.b,'checkout','--detach');const detached=await diagnose(f.b);assert.equal(detached.branch,null);assert.equal(detached.ready,false);
+  assert.equal(await git(f.b,'rev-parse','HEAD'),before);
+  assert.equal((await diagnose(f.root)).repository,false);assert.equal((await diagnose('https://github.com/a/b.git')).pathValid,false);
+});
 test('daemon API and CLI: authentication, add, status, pause, shutdown',async t=>{
   const f=await fixture(t), home=path.join(f.root,'config');
   const child=spawn(process.execPath,['src/cli.js','daemon'],{cwd:path.resolve(import.meta.dirname,'..'),env:{...process.env,DEVSYNC_HOME:home,GIT_CONFIG_COUNT:'1',GIT_CONFIG_KEY_0:`url.${new URL('file:///' + path.join(f.root,'remote.git').replaceAll('\\','/')).href}.insteadOf`,GIT_CONFIG_VALUE_0:'https://github.com/example/test.git'},stdio:['ignore','pipe','pipe']});
@@ -74,6 +102,17 @@ test('daemon API and CLI: authentication, add, status, pause, shutdown',async t=
   assert.equal((await (await fetch(url+'/api/status',{headers})).json()).projects.length,0);
   await git(f.b,'branch','--set-upstream-to=origin/main');
   const added=await command({command:'add',path:f.b});await command({command:'pause',id:added.project.id});
+  const diagnostics=await command({command:'diagnose',path:f.b});
+  assert.equal(diagnostics.ready,true);assert.equal(diagnostics.identity.nameConfigured,true);assert.equal(diagnostics.identity.name,undefined);
+  assert.equal((await command({command:'diagnose',path:path.join(f.root,'missing')})).pathValid,false);
+  await command({command:'settings',id:added.project.id,syncIntervalSeconds:120,checkpointDelaySeconds:90,checkpointInclude:['hello.txt']});
+  await rejected({command:'settings',id:added.project.id,syncIntervalSeconds:1},/15/);
+  await rejected({command:'settings',id:added.project.id,checkpointInclude:['../private']},/relativos/);
+  const journal=await (await fetch(url+'/api/history?projectId='+added.project.id+'&limit=2',{headers})).json();
+  assert.equal(journal.entries.length,2);assert.equal(journal.entries[0].action,'settings');assert.equal(journal.entries[0].source,'manual');
+  assert.ok(journal.entries.every(entry=>entry.projectId===added.project.id));
+  assert.equal((await fetch(url+'/api/history?limit=0',{headers})).status,400);
+  assert.equal((await fetch(url+'/api/history')).status,401);
   await rejected({command:'add',path:f.b},/já cadastrado/);
   await rejected({command:'add',path:'https://github.com/example/test.git'},/pasta local/);
   await rejected({command:'clone',url:'file:///untrusted',path:path.join(f.root,'clone')},/HTTPS/);
@@ -81,6 +120,7 @@ test('daemon API and CLI: authentication, add, status, pause, shutdown',async t=
   await rejected({command:'clone',url:'https://github.com/example/test.git',path:path.join(f.root,'clone')},/já existe/);
   await command({command:'checkpoint-on',id:added.project.id});await command({command:'checkpoint-off',id:added.project.id});
   const status=await (await fetch(url+'/api/status',{headers})).json();assert.equal(status.projects[0].paused,true);
+  assert.equal(status.projects[0].syncIntervalSeconds,120);assert.deepEqual(status.projects[0].checkpointInclude,['hello.txt']);
   const cli=await promisify(execFile)(process.execPath,['src/cli.js','status'],{cwd:path.resolve(import.meta.dirname,'..'),env:{...process.env,DEVSYNC_HOME:home}});
   assert.equal(JSON.parse(cli.stdout).projects[0].id,added.project.id);
   const coordinator=await createCoordinator({directory:path.join(f.root,'coordinator'),adminToken:'a'.repeat(64),port:0});t.after(()=>coordinator.close());

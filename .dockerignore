@@ -1,0 +1,19 @@
+**
+!package.json
+!src/
+!src/**
+!ui/
+!ui/**
+!Dockerfile
+# Defense in depth: only the application sources above enter the image.
+.git
+.backups
+.qa
+.env
+.env.*
+node_modules
+dist
+coordinator-data
+**/*.pem
+**/*.key
+**/*credentials*

@@ -1,10 +1,14 @@
-const { app, BrowserWindow, Tray, Menu, nativeImage, dialog, ipcMain, Notification } = require('electron');
+const { app, BrowserWindow, Tray, Menu, nativeImage, dialog, ipcMain, Notification, session } = require('electron');
 const path = require('node:path');
 const { pathToFileURL } = require('node:url');
 const { deflateSync } = require('node:zlib');
-let window, tray, service, runtime, quitting = false, pollTimer;
+let window, tray, service, runtime, quitting = false, pollTimer, updateTimer, updateInitialTimer, updates, stopPromise;
+function stopOnce() {
+  clearInterval(pollTimer); clearInterval(updateTimer); clearTimeout(updateInitialTimer);
+  return stopPromise ||= Promise.resolve().then(() => service?.stop());
+}
 const smoke = process.argv.includes('--smoke-test');
-let bridgeReady = false;
+let bridgeReady = false, updateBridgeReady = false;
 if (smoke) {
   process.env.DEVSYNC_HOME ||= path.join(app.getPath('temp'), 'devsync-smoke-' + process.pid);
   const profile = path.join(process.env.DEVSYNC_HOME, 'electron');
@@ -35,7 +39,7 @@ else {
   app.on('window-all-closed', () => {});
   app.whenReady().then(async () => {
     if (process.platform === 'win32') app.setAppUserModelId('com.devsync.desktop');
-    const { read } = await import(pathToFileURL(path.join(__dirname,'../src/store.js')).href);
+    const { read, write } = await import(pathToFileURL(path.join(__dirname,'../src/store.js')).href);
     try {
       try {
         const existing = await read('runtime.json');
@@ -49,13 +53,37 @@ else {
       ipcMain.handle('choose-folder', async event => { if (!trusted(event)) throw Error('Origem inválida.');const result=await dialog.showOpenDialog(window,{properties:['openDirectory']});return result.canceled?null:result.filePaths[0]; });
       ipcMain.handle('startup-get', event => { if(!trusted(event))throw Error('Origem inválida.');bridgeReady=true;return app.getLoginItemSettings({path:process.execPath,args:startupArgs}).openAtLogin; });
       ipcMain.handle('startup-set', (event, enabled) => { if(!trusted(event)||typeof enabled!=='boolean')throw Error('Pedido inválido.');app.setLoginItemSettings({openAtLogin:enabled,path:process.execPath,args:startupArgs});return app.getLoginItemSettings({path:process.execPath,args:startupArgs}).openAtLogin; });
+      const supportedUpdates = app.isPackaged && process.platform === 'win32';
+      const { createUpdateController, isAllowedUpdateRequest } = require('./updates.cjs');
+      updates = createUpdateController({
+        updater: supportedUpdates ? require('electron-updater').autoUpdater : null,
+        supported: supportedUpdates, currentVersion: app.getVersion(),
+        initial: await read('desktop-updates.json', {}),
+        save: settings => write('desktop-updates.json', settings),
+        confirmFeed: async feedUrl => (await dialog.showMessageBox(window, { type: 'question', title: 'Fonte de atualizações', message: 'Confiar nesta fonte de atualizações do DevSync?', detail: feedUrl + '\nEsta fonte fornece instaladores que serão executados no seu computador após sua confirmação. Use somente uma fonte que você administra ou conhece.', buttons: ['Cancelar', 'Confiar e salvar'], defaultId: 0, cancelId: 0 })).response === 1,
+        confirmInstall: async version => (await dialog.showMessageBox(window, { type: 'question', title: 'Instalar atualização', message: 'Instalar o DevSync ' + version + ' e reiniciar?', detail: 'A sincronização deste aplicativo será encerrada antes de abrir o instalador.', buttons: ['Agora não', 'Instalar e reiniciar'], defaultId: 0, cancelId: 0 })).response === 1,
+        // Keep the tray/window available if installer launch fails. Normal
+        // before-quit reuses the resolved stop promise and cleans up once.
+        prepareInstall: async () => { await stopOnce(); }
+      });
+      if (supportedUpdates) session.fromPartition('electron-updater', { cache: false }).webRequest.onBeforeRequest((details, callback) => {
+        // Apply to metadata, installer, blockmap and every redirect target.
+        callback({ cancel: !isAllowedUpdateRequest(details.url, updates.state().feedUrl) });
+      });
+      for (const [channel, action] of Object.entries({ 'updates-get': () => { updateBridgeReady = true; return updates.state(); }, 'updates-configure': value => updates.configure(value), 'updates-check': () => updates.check(), 'updates-download': () => updates.download(), 'updates-install': () => updates.install() })) {
+        ipcMain.handle(channel, (event, value) => { if (!trusted(event)) throw Error('Origem inválida.'); return action(value); });
+      }
+      if (!smoke) {
+        updateInitialTimer = setTimeout(() => updates.check(), 15000);
+        updateTimer = setInterval(() => updates.check(), 6 * 60 * 60 * 1000);
+      }
       tray = new Tray(icon());tray.setToolTip('DevSync — sincronização de projetos');
       tray.setContextMenu(Menu.buildFromTemplate([{label:'Abrir DevSync',click:show},{label:'Sair',click:()=>app.quit()}]));tray.on('double-click',show);
       const last = new Map(); let checking=false;
       pollTimer=setInterval(async()=>{if(checking)return;checking=true;try{const r=await fetch(`http://127.0.0.1:${runtime.port}/api/status`,{headers:{authorization:`Bearer ${runtime.token}`},signal:AbortSignal.timeout(5000)});if(!r.ok)return;const {projects}=await r.json();for(const p of projects){const previous=last.get(p.id);last.set(p.id,p.state);if(previous&&previous!==p.state&&['error','dirty','diverged','synced'].includes(p.state)&&Notification.isSupported())new Notification({title:'DevSync: '+p.name,body:p.state==='synced'?'Projeto sincronizado.':'O projeto precisa de atenção. Abra o DevSync para ver os detalhes.'}).show()}}catch{}finally{checking=false}},10000);
       if (!process.argv.includes('--background')) await show();
-      if (smoke) setTimeout(() => { console.log(JSON.stringify({ desktopSmoke: bridgeReady ? 'passed' : 'failed', tray: !tray.isDestroyed(), ownedService: Boolean(service) })); if(!bridgeReady)process.exitCode=1;app.quit(); }, 2000);
+      if (smoke) setTimeout(() => { const passed = bridgeReady && updateBridgeReady; console.log(JSON.stringify({ desktopSmoke: passed ? 'passed' : 'failed', tray: !tray.isDestroyed(), ownedService: Boolean(service), updateBridge: updateBridgeReady, updatesSupported: supportedUpdates })); if(!passed)process.exitCode=1;app.quit(); }, 2000);
     } catch (error) { dialog.showErrorBox('Não foi possível iniciar o DevSync',error.message);app.quit(); }
   });
-  app.on('before-quit', event => { if (quitting) return;event.preventDefault();quitting=true;clearInterval(pollTimer);Promise.resolve(service?.stop()).finally(()=>{tray?.destroy();app.quit()}); });
+  app.on('before-quit', event => { if (quitting) return;event.preventDefault();quitting=true;stopOnce().finally(()=>{tray?.destroy();app.quit()}); });
 }
