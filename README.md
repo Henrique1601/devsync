@@ -2,6 +2,10 @@
 
 Sincronização Git entre seus PCs, com aplicativo de bandeja para Windows, CLI, painel local, coordenador remoto e checkpoints optativos. O GitHub transporta o código; o coordenador acompanha dispositivos e pedidos.
 
+## Segundo cérebro no Obsidian
+
+Abra a pasta `Segundo Cerebro DevSync` como cofre no Obsidian e comece por [00 Comece aqui](Segundo%20Cerebro%20DevSync/00%20Comece%20aqui.md). O cofre contém guias de uso, rotina Casa/Trabalho, diagnóstico, arquitetura, mapa Canvas e modelos de decisões, incidentes e sessões de trabalho. Nenhum plugin de comunidade é necessário. Consulte [Como usar este cofre](Segundo%20Cerebro%20DevSync/Como%20usar%20este%20cofre.md).
+
 ## Usar o aplicativo Windows
 
 Execute `dist/DevSync Setup 0.3.0.exe` e siga o instalador. O aplicativo contém seu próprio runtime; precisa somente de Git instalado e autenticação Git configurada. O instalador ainda não possui certificado de assinatura de um publicador.

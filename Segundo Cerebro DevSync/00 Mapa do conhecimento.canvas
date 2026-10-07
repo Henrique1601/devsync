@@ -1,0 +1,284 @@
+{
+  "nodes": [
+    {
+      "id": "inicio",
+      "type": "file",
+      "file": "00 Comece aqui.md",
+      "x": -240,
+      "y": -480,
+      "width": 480,
+      "height": 340,
+      "color": "6"
+    },
+    {
+      "id": "comecar",
+      "type": "group",
+      "label": "🚀 Começar",
+      "x": -900,
+      "y": 0,
+      "width": 540,
+      "height": 990,
+      "color": "2"
+    },
+    {
+      "id": "operar",
+      "type": "group",
+      "label": "⚙️ Operar",
+      "x": -300,
+      "y": 0,
+      "width": 540,
+      "height": 990,
+      "color": "5"
+    },
+    {
+      "id": "entender",
+      "type": "group",
+      "label": "🧩 Entender",
+      "x": 300,
+      "y": 0,
+      "width": 540,
+      "height": 990,
+      "color": "6"
+    },
+    {
+      "id": "evoluir",
+      "type": "group",
+      "label": "📝 Evoluir",
+      "x": 900,
+      "y": 0,
+      "width": 540,
+      "height": 990,
+      "color": "4"
+    },
+    {
+      "id": "comecar-0",
+      "type": "file",
+      "file": "02 Uso/Primeiros passos.md",
+      "x": -875,
+      "y": 55,
+      "width": 490,
+      "height": 260,
+      "color": "2"
+    },
+    {
+      "id": "comecar-1",
+      "type": "file",
+      "file": "02 Uso/Rotina Casa e Trabalho.md",
+      "x": -875,
+      "y": 355,
+      "width": 490,
+      "height": 260,
+      "color": "2"
+    },
+    {
+      "id": "comecar-2",
+      "type": "file",
+      "file": "02 Uso/Checkpoints e regras.md",
+      "x": -875,
+      "y": 655,
+      "width": 490,
+      "height": 260,
+      "color": "2"
+    },
+    {
+      "id": "operar-0",
+      "type": "file",
+      "file": "02 Uso/Historico e estados.md",
+      "x": -275,
+      "y": 55,
+      "width": 490,
+      "height": 260,
+      "color": "5"
+    },
+    {
+      "id": "operar-1",
+      "type": "file",
+      "file": "02 Uso/Painel remoto.md",
+      "x": -275,
+      "y": 355,
+      "width": 490,
+      "height": 260,
+      "color": "5"
+    },
+    {
+      "id": "operar-2",
+      "type": "file",
+      "file": "04 Problemas/Diagnostico e erros.md",
+      "x": -275,
+      "y": 655,
+      "width": 490,
+      "height": 260,
+      "color": "5"
+    },
+    {
+      "id": "entender-0",
+      "type": "file",
+      "file": "03 Engenharia/Arquitetura.md",
+      "x": 325,
+      "y": 55,
+      "width": 490,
+      "height": 260,
+      "color": "6"
+    },
+    {
+      "id": "entender-1",
+      "type": "file",
+      "file": "03 Engenharia/Mapa do codigo.md",
+      "x": 325,
+      "y": 355,
+      "width": 490,
+      "height": 260,
+      "color": "6"
+    },
+    {
+      "id": "entender-2",
+      "type": "file",
+      "file": "03 Engenharia/Dados e seguranca.md",
+      "x": 325,
+      "y": 655,
+      "width": 490,
+      "height": 260,
+      "color": "6"
+    },
+    {
+      "id": "evoluir-0",
+      "type": "file",
+      "file": "01 Projeto/Estado e limites.md",
+      "x": 925,
+      "y": 55,
+      "width": 490,
+      "height": 260,
+      "color": "4"
+    },
+    {
+      "id": "evoluir-1",
+      "type": "file",
+      "file": "01 Projeto/Roadmap.md",
+      "x": 925,
+      "y": 355,
+      "width": 490,
+      "height": 260,
+      "color": "4"
+    },
+    {
+      "id": "evoluir-2",
+      "type": "file",
+      "file": "05 Registros/Caixa de entrada.md",
+      "x": 925,
+      "y": 655,
+      "width": 490,
+      "height": 260,
+      "color": "4"
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge-comecar-0",
+      "fromNode": "inicio",
+      "fromSide": "bottom",
+      "toNode": "comecar-0",
+      "toSide": "top",
+      "label": "explorar",
+      "color": "2"
+    },
+    {
+      "id": "edge-comecar-1",
+      "fromNode": "comecar-0",
+      "fromSide": "bottom",
+      "toNode": "comecar-1",
+      "toSide": "top",
+      "label": "seguir",
+      "color": "2"
+    },
+    {
+      "id": "edge-comecar-2",
+      "fromNode": "comecar-1",
+      "fromSide": "bottom",
+      "toNode": "comecar-2",
+      "toSide": "top",
+      "label": "seguir",
+      "color": "2"
+    },
+    {
+      "id": "edge-operar-0",
+      "fromNode": "inicio",
+      "fromSide": "bottom",
+      "toNode": "operar-0",
+      "toSide": "top",
+      "label": "explorar",
+      "color": "5"
+    },
+    {
+      "id": "edge-operar-1",
+      "fromNode": "operar-0",
+      "fromSide": "bottom",
+      "toNode": "operar-1",
+      "toSide": "top",
+      "label": "seguir",
+      "color": "5"
+    },
+    {
+      "id": "edge-operar-2",
+      "fromNode": "operar-1",
+      "fromSide": "bottom",
+      "toNode": "operar-2",
+      "toSide": "top",
+      "label": "seguir",
+      "color": "5"
+    },
+    {
+      "id": "edge-entender-0",
+      "fromNode": "inicio",
+      "fromSide": "bottom",
+      "toNode": "entender-0",
+      "toSide": "top",
+      "label": "explorar",
+      "color": "6"
+    },
+    {
+      "id": "edge-entender-1",
+      "fromNode": "entender-0",
+      "fromSide": "bottom",
+      "toNode": "entender-1",
+      "toSide": "top",
+      "label": "seguir",
+      "color": "6"
+    },
+    {
+      "id": "edge-entender-2",
+      "fromNode": "entender-1",
+      "fromSide": "bottom",
+      "toNode": "entender-2",
+      "toSide": "top",
+      "label": "seguir",
+      "color": "6"
+    },
+    {
+      "id": "edge-evoluir-0",
+      "fromNode": "inicio",
+      "fromSide": "bottom",
+      "toNode": "evoluir-0",
+      "toSide": "top",
+      "label": "explorar",
+      "color": "4"
+    },
+    {
+      "id": "edge-evoluir-1",
+      "fromNode": "evoluir-0",
+      "fromSide": "bottom",
+      "toNode": "evoluir-1",
+      "toSide": "top",
+      "label": "seguir",
+      "color": "4"
+    },
+    {
+      "id": "edge-evoluir-2",
+      "fromNode": "evoluir-1",
+      "fromSide": "bottom",
+      "toNode": "evoluir-2",
+      "toSide": "top",
+      "label": "seguir",
+      "color": "4"
+    }
+  ]
+}

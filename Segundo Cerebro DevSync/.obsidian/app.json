@@ -1,0 +1,9 @@
+{
+  "alwaysUpdateLinks": true,
+  "useMarkdownLinks": false,
+  "newLinkFormat": "absolute",
+  "attachmentFolderPath": "08 Anexos",
+  "newFileLocation": "folder",
+  "newFileFolderPath": "05 Registros",
+  "defaultViewMode": "preview"
+}

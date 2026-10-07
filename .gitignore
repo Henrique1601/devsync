@@ -10,3 +10,7 @@ coordinator-data/
 !.env.example
 *.pem
 *.key
+Segundo Cerebro DevSync/.obsidian/workspace*.json
+Segundo Cerebro DevSync/.obsidian/cache/
+Segundo Cerebro DevSync/.obsidian/trash/
+Segundo Cerebro DevSync/.trash/
