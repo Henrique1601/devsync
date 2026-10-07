@@ -1,0 +1,12 @@
+import path from 'node:path';
+import { mkdir, writeFile } from 'node:fs/promises';
+const directory = path.resolve('.qa');
+process.env.DEVSYNC_HOME = path.join(directory,'local');
+const { daemon } = await import('../src/daemon.js');
+const { createCoordinator } = await import('../src/coordinator.js');
+const local = await daemon();
+const remote = await createCoordinator({ directory:path.join(directory,'remote'), adminToken:'devsync-test-admin-token-not-for-production-000000000000', port:0 });
+await mkdir(directory,{recursive:true});
+await writeFile(path.join(directory,'urls.json'), JSON.stringify({local:`http://127.0.0.1:${local.port}/#${local.token}`,remote:`http://127.0.0.1:${remote.server.address().port}`}));
+console.log('Servidores de QA disponíveis em .qa/urls.json');
+const stop=async()=>{await local.stop();await remote.close();process.exit(0)};process.on('SIGINT',stop);process.on('SIGTERM',stop);

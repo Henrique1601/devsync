@@ -1,0 +1,12 @@
+node_modules/
+*.log
+.devsync/
+dist/
+coordinator-data/
+.qa/
+.backups/
+.env
+.env.*
+!.env.example
+*.pem
+*.key

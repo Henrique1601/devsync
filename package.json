@@ -1,0 +1,46 @@
+{
+  "name": "devsync-local",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "bin": {
+    "devsync": "./src/cli.js"
+  },
+  "main": "desktop/main.cjs",
+  "description": "Sincronização Git entre computadores",
+  "author": "DevSync",
+  "scripts": {
+    "start": "node src/cli.js daemon",
+    "test": "node --test",
+    "devsync": "node src/cli.js",
+    "desktop": "electron .",
+    "coordinator": "node src/cli.js coordinator",
+    "dist": "electron-builder --win nsis",
+    "pack": "electron-builder --dir"
+  },
+  "build": {
+    "appId": "com.devsync.desktop",
+    "productName": "DevSync",
+    "files": [
+      "desktop/**/*",
+      "src/**/*",
+      "ui/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": "nsis"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  },
+  "devDependencies": {
+    "electron": "^44.6.0",
+    "electron-builder": "^26.15.3"
+  }
+}
