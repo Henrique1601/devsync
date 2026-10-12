@@ -18,6 +18,7 @@
     "devsync": "node src/cli.js",
     "desktop": "electron .",
     "coordinator": "node src/cli.js coordinator",
+    "token": "node -e \"console.log(require('node:crypto').randomBytes(32).toString('hex'))\"",
     "dist": "electron-builder --win nsis --publish never",
     "pack": "electron-builder --dir --publish never"
   },

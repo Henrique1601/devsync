@@ -32,7 +32,7 @@ O relatório do projeto registra **36 testes aprovados**, smoke do executável e
 | --- | --- |
 | Painel remoto pela internet | Escolher host, publicar com HTTPS e persistência |
 | Fonte de atualizações | Publicar manifesto, instalador e blockmap em HTTPS |
-| Sincronização do próprio código DevSync entre PCs | Configurar um remoto Git; ele não estava configurado na entrega |
+| Sincronização do próprio código DevSync entre PCs | **Configurado** (repositório remoto conectado em `https://github.com/Henrique1601/devsync`) |
 
 ## Ainda não comprovado em ambiente real
 

@@ -38,7 +38,8 @@ Procedimento: [[03 Engenharia/Hospedagem e operacao]].
 - [ ] Publicar a fonte HTTPS de atualizações.
 - [ ] Testar atualização completa de uma versão instalada.
 - [ ] Definir assinatura de código para o instalador.
-- [ ] Configurar remoto Git para o próprio DevSync.
+- [x] Configurar remoto Git para o próprio DevSync (`https://github.com/Henrique1601/devsync`).
+- [x] Configurar GitHub Actions CI e Release pipelines (`.github/workflows/`).
 - [ ] Fazer avaliação completa de acessibilidade.
 
 ## Evoluções para discutir
