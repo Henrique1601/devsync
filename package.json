@@ -19,7 +19,7 @@
     "desktop": "electron .",
     "coordinator": "node src/cli.js coordinator",
     "token": "node -e \"console.log(require('node:crypto').randomBytes(32).toString('hex'))\"",
-    "dist": "electron-builder --win nsis --publish never",
+    "dist": "electron-builder --win nsis portable --publish never",
     "pack": "electron-builder --dir --publish never"
   },
   "build": {
@@ -32,7 +32,10 @@
       "package.json"
     ],
     "win": {
-      "target": "nsis"
+      "target": [
+        "nsis",
+        "portable"
+      ]
     },
     "nsis": {
       "oneClick": false,
@@ -40,10 +43,14 @@
       "allowToChangeInstallationDirectory": true,
       "artifactName": "DevSync Setup ${version}.${ext}"
     },
+    "portable": {
+      "artifactName": "DevSync ${version} Portable.${ext}"
+    },
     "publish": [
       {
-        "provider": "generic",
-        "url": "https://updates.devsync.invalid/windows/"
+        "provider": "github",
+        "owner": "Henrique1601",
+        "repo": "devsync"
       }
     ],
     "electronUpdaterCompatibility": ">= 2.16"

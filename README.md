@@ -8,7 +8,11 @@ Abra a pasta `Segundo Cerebro DevSync` como cofre no Obsidian e comece por [00 C
 
 ## Usar o aplicativo Windows
 
-Execute `dist/DevSync Setup 0.3.0.exe` e siga o instalador. O aplicativo contém seu próprio runtime; precisa somente de Git instalado e autenticação Git configurada. O instalador ainda não possui certificado de assinatura de um publicador.
+Baixe o executável diretamente na página de [**Releases no GitHub**](https://github.com/Henrique1601/devsync/releases):
+- **Instalador (`DevSync Setup 0.3.0.exe`):** Instala o aplicativo no Windows, cria atalhos e permite iniciar automaticamente com o sistema.
+- **Portátil (`DevSync 0.3.0 Portable.exe`):** Executável único que roda diretamente sem necessidade de instalação.
+
+O aplicativo contém seu próprio runtime integrado; requer apenas Git instalado no computador e autenticação Git configurada. O instalador ainda não possui certificado de assinatura de um publicador comercial (ao abrir pela primeira vez, clique em *"Mais informações"* -> *"Executar assim mesmo"*).
 
 Abra DevSync. Para um repositório já baixado, use **Selecionar pasta** e **Cadastrar**. Para baixar um novo, use **Clonar do GitHub**, informe a URL HTTPS e o caminho absoluto de uma nova pasta. O diretório pai precisa existir. Repositórios privados usam as credenciais já configuradas no Git.
 
