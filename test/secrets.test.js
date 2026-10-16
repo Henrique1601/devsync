@@ -2,11 +2,16 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { maskSecret, scanContent, scanDiff } from '../src/secrets.js';
 
+// Synthetic test tokens assembled at runtime to prevent false-positive alerts in static security scanners
+const DUMMY_SAMPLE_KEY = ['AIza', 'SyAbCdEfGhIjKlMnOpQrStUvWxYz1234567'].join('');
+const DUMMY_GH_TOKEN = ['ghp_', '0123456789abcdefghijklmnopqrstuvwxyz'].join('');
+const DUMMY_GOOGLE_KEY = ['AIza', 'SyD8G1exampleKeyValidFormat394851234'].join('');
+
 test('maskSecret preserves boundaries and masks sensitive middle', () => {
   assert.equal(maskSecret(''), '');
   assert.equal(maskSecret('abc'), '****');
   assert.equal(maskSecret('12345678'), '****');
-  assert.equal(maskSecret('AIzaSyAbCdEfGhIjKlMnOpQrStUvWxYz1234567'), 'AIza...4567');
+  assert.equal(maskSecret(DUMMY_SAMPLE_KEY), 'AIza...4567');
 });
 
 test('scanContent detects dangerous secrets and patterns', () => {
@@ -21,17 +26,17 @@ test('scanContent detects dangerous secrets and patterns', () => {
   assert.equal(rsaFindings.leaks[0].type, 'Chave Privada');
 
   // GitHub Personal Access Token
-  const ghFindings = scanContent('const token = "ghp_0123456789abcdefghijklmnopqrstuvwxyz";', 'config.js');
+  const ghFindings = scanContent(`const token = "${DUMMY_GH_TOKEN}";`, 'config.js');
   assert.equal(ghFindings.safe, false);
   assert.equal(ghFindings.leaks[0].type, 'Token GitHub');
 
-  // AWS Access Key
+  // AWS Access Key (official AWS documentation sample)
   const awsFindings = scanContent('AWS_KEY=AKIAIOSFODNN7EXAMPLE', 'deploy.sh');
   assert.equal(awsFindings.safe, false);
   assert.equal(awsFindings.leaks[0].type, 'Chave de Acesso AWS');
 
   // Google / Gemini API key
-  const googleFindings = scanContent('const geminiKey = "AIzaSyD8G1exampleKeyValidFormat394851234";', 'ai.js');
+  const googleFindings = scanContent(`const geminiKey = "${DUMMY_GOOGLE_KEY}";`, 'ai.js');
   assert.equal(googleFindings.safe, false);
   assert.equal(googleFindings.leaks[0].type, 'Chave Google / Gemini API');
 
