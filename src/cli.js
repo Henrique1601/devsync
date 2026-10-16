@@ -14,16 +14,18 @@ try {
     const { startMcpServer } = await import('./mcp.js');
     await startMcpServer();
   }
-  else if (command === 'help') console.log(`DevSync 0.4 — Node.js 22+ e Git
+  else if (command === 'help') console.log(`DevSync 0.5 — Node.js 22+ e Git
 
   devsync daemon                         Inicia serviço local
   devsync mcp                            Inicia servidor MCP (Model Context Protocol) via stdio
   devsync add <pasta>                     Cadastra clone com upstream
   devsync clone <url-github> <nova-pasta>  Clona e cadastra um projeto
   devsync status                         Exibe projetos e conexão remota
+  devsync metrics                        Exibe estatísticas de sincronização e tempo economizado
   devsync history [id] [limite]           Exibe histórico persistente
   devsync diagnose <pasta>               Verifica Git e configuração
   devsync diff <id>                      Exibe arquivos alterados e diff seguro
+  devsync predict-conflicts <id>         Simula em memória se haverá conflitos no Git
   devsync settings <id> <intervalo> <espera> <padrões separados por vírgula>
   devsync sync <id>                       Sincroniza projeto agora (ou --all para todos)
   devsync sync-all                       Sincroniza todos os projetos ativos em lote
@@ -32,6 +34,9 @@ try {
   devsync push-on <id> / push-off <id>    Controla envio automático
   devsync checkpoint-on <id>              Autoriza commits automáticos
   devsync checkpoint-off <id>             Desativa commits automáticos
+  devsync webhook-config <url> [serviço] [chatId]  Configura webhook (Discord/Telegram/Genérico)
+  devsync webhook-test                   Envia notificação de teste pelo webhook
+  devsync webhook-off                    Desativa notificações de webhook
   devsync check-remote <url>              Testa conectividade com coordenador remoto
   devsync remote-config <url> <token> <device-id> <nome>
   devsync remote-off                     Desconecta painel remoto
@@ -47,11 +52,13 @@ Checkpoints e envio são optativos e começam desativados.`);
     if (command === 'dashboard') console.log(`${url}/#${runtime.token}`);
     else {
       const normalized = command === 'sync' && argument === '--all' ? 'sync-all' : command;
-      const readonly = ['status', 'history'].includes(normalized);
-      const route = normalized === 'history' ? 'history?' + new URLSearchParams({ ...(argument ? { projectId: argument } : {}), ...(extra ? { limit: extra } : {}) }) : normalized === 'status' ? 'status' : 'command';
+      const readonly = ['status', 'history', 'metrics'].includes(normalized);
+      const route = normalized === 'history' ? 'history?' + new URLSearchParams({ ...(argument ? { projectId: argument } : {}), ...(extra ? { limit: extra } : {}) }) : ['status', 'metrics'].includes(normalized) ? normalized : 'command';
       const payload = normalized === 'clone' ? { command: normalized, url: argument, path: extra }
         : normalized === 'remote-config' ? { command: normalized, settings: { url: argument, token: extra, deviceId, name } }
         : normalized === 'check-remote' ? { command: normalized, url: argument }
+        : normalized === 'webhook-config' ? { command: normalized, settings: { url: argument, service: extra, chatId: deviceId } }
+        : ['webhook-test', 'webhook-off'].includes(normalized) ? { command: normalized }
         : normalized === 'stash-sync' ? { command: normalized, id: argument, pop: extra !== '--no-pop' }
         : normalized === 'settings' ? { command: normalized, id: argument, ...(extra === undefined ? {} : { syncIntervalSeconds: Number(extra) }), ...(deviceId === undefined ? {} : { checkpointDelaySeconds: Number(deviceId) }), ...(name === undefined ? {} : { checkpointInclude: name.split(',').map(value => value.trim()) }) }
         : { command: normalized, path: argument, id: argument };

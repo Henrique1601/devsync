@@ -1,7 +1,7 @@
 ---
 tipo: referencia
-versao: "0.3.0"
-atualizado: 2026-10-07
+versao: "0.5.0"
+atualizado: 2026-10-16
 tags: [devsync, referencia]
 cssclasses: [devsync]
 fontes: ["src/cli.js"]
@@ -17,13 +17,12 @@ Set-Location "C:/Users/henri/Programacao/Projetos/devsync"
 npm start
 ```
 
-Mantenha esse terminal aberto. Em outro terminal, use os comandos abaixo. Se o desktop já criou o serviço, ele também atende a CLI na mesma configuração local.
-
 ## Consultar e cadastrar
 
 ```powershell
 node src/cli.js help
 node src/cli.js status
+node src/cli.js metrics
 node src/cli.js dashboard
 node src/cli.js diagnose "C:/Projetos/meu-crm"
 node src/cli.js add "C:/Projetos/meu-crm"
@@ -31,12 +30,14 @@ node src/cli.js clone "https://github.com/usuario/projeto.git" "C:/Projetos/nova
 node src/cli.js history ID_DO_PROJETO 100
 ```
 
-Use o ID retornado pelo status. Ele diferencia projetos com nomes iguais. O endereço do dashboard contém um token local; abra no próprio computador e não copie para notas ou mensagens.
-
-## Controlar um projeto
+## Controle e diagnóstico Git
 
 ```powershell
 node src/cli.js sync ID_DO_PROJETO
+node src/cli.js sync-all
+node src/cli.js diff ID_DO_PROJETO
+node src/cli.js predict-conflicts ID_DO_PROJETO
+node src/cli.js stash-sync ID_DO_PROJETO [--no-pop]
 node src/cli.js pause ID_DO_PROJETO
 node src/cli.js resume ID_DO_PROJETO
 node src/cli.js push-on ID_DO_PROJETO
@@ -46,26 +47,30 @@ node src/cli.js checkpoint-off ID_DO_PROJETO
 node src/cli.js settings ID_DO_PROJETO 30 60 "src/**,README.md"
 ```
 
-No último comando: intervalo, espera estável e padrões separados por vírgula. O comando **settings** salva regras; não ativa checkpoints nem envio.
-
-A sintaxe também oferece `remote-config <url> <token> <device-id> <nome>`, mas o painel com campo protegido é preferível para inserir tokens sem gravá-los no histórico do terminal.
+## Webhooks e Notificações
 
 ```powershell
+node src/cli.js webhook-config "https://discord.com/api/webhooks/..." discord
+node src/cli.js webhook-config "https://api.telegram.org/bot.../sendMessage" telegram CHAT_ID
+node src/cli.js webhook-test
+node src/cli.js webhook-off
+```
+
+## Servidor MCP (Agentes de IA)
+
+Para conectar ferramentas como Claude Code, Cursor ou Antigravity:
+
+```powershell
+node src/cli.js mcp
+```
+
+## Painel remoto e Coordenador
+
+```powershell
+node src/cli.js check-remote "https://seu-coordenador.com"
+node src/cli.js remote-config "https://seu-coordenador.com" TOKEN DEVICE_ID "Casa"
 node src/cli.js remote-off
+node src/cli.js coordinator
 ```
-
-## Usar uma configuração isolada
-
-No terminal que inicia o serviço e em cada terminal de controle:
-
-```powershell
-$env:DEVSYNC_HOME = "C:/DevSync-testes/config"
-```
-
-A variável só vale para aquele processo e seus filhos. Não muda retroativamente um serviço já iniciado. Veja [[03 Engenharia/Dados e seguranca]].
-
-## Encerrar
-
-Use Ctrl+C no terminal do serviço CLI. O desktop tem **Sair** na bandeja. Fechar a janela do desktop apenas a oculta.
 
 ← [[00 Comece aqui]]

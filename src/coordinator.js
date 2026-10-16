@@ -65,6 +65,19 @@ export async function createCoordinator({ directory, adminToken, host = '127.0.0
           res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Frame-Options': 'DENY', 'Content-Security-Policy': "default-src 'self'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'; frame-ancestors 'none'", 'Referrer-Policy': 'no-referrer' });
           return res.end(page);
         }
+        if (req.method === 'GET' && req.url === '/manifest.json') {
+          const manifest = JSON.stringify({
+            name: 'DevSync Coordenador',
+            short_name: 'DevSync',
+            start_url: '/',
+            display: 'standalone',
+            background_color: '#0d1424',
+            theme_color: '#0d1424',
+            icons: [{ src: '/favicon.ico', sizes: '64x64 32x32 24x24 16x16', type: 'image/x-icon' }]
+          });
+          res.writeHead(200, { 'Content-Type': 'application/manifest+json; charset=utf-8', 'Cache-Control': 'no-store' });
+          return res.end(manifest);
+        }
         if (req.url === '/favicon.ico') { res.writeHead(204); return res.end(); }
         // Reject browser cross-origin requests even when a token is available.
         if (req.headers.origin) {

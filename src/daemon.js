@@ -4,7 +4,9 @@ import { mkdir, rm, realpath, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { home, read, write } from './store.js';
-import { git, inspect, inspectDiff, stashAndSync, synchronize } from './git.js';
+import { git, inspect, inspectDiff, predictConflicts, stashAndSync, synchronize } from './git.js';
+import { validateWebhookSettings, sendWebhook } from './webhooks.js';
+import { calculateMetrics } from './metrics.js';
 import { startRemote, validateRemote } from './remote-client.js';
 import { acquireServiceLock } from './service-lock.js';
 import { rulesFor, validateRules, isSyncDue } from './rules.js';
@@ -45,6 +47,15 @@ export async function daemon() {
       const result = states.get(repo.id);
       await history.append({ projectId: repo.id, projectName: repo.name, source, action: 'sync', startedAt, finishedAt: result.checkedAt,
         ...result, reason: result.message || stateReasons[result.state], before, after: { ...await snapshot(repo), state: result.state } });
+      if (config.webhook?.enabled && ['synced', 'checkpoint', 'error', 'diverged'].includes(result.state)) {
+        sendWebhook(config.webhook, {
+          type: result.state,
+          project: repo,
+          message: result.message || stateReasons[result.state],
+          receivedCommits: result.receivedCommits || 0,
+          sentCommits: result.sentCommits || 0
+        }).catch(() => {});
+      }
       });
     }
     let ticking = false;
@@ -91,6 +102,33 @@ export async function daemon() {
         await write('config.json', { ...config, remote: settings }); config.remote = settings; return { ok: true };
       }
       if (data.command === 'remote-off') { const { remote: ignored, ...next } = config; await write('config.json', next); delete config.remote; return { ok: true }; }
+      if (data.command === 'metrics') {
+        const historyEntries = history.query({ limit: 500 }).entries;
+        return calculateMetrics(historyEntries, config.projects);
+      }
+      if (data.command === 'webhook-config') {
+        let settings;
+        try { settings = validateWebhookSettings(data.settings); } catch (error) { throw new CommandError(error.message); }
+        await write('config.json', { ...config, webhook: settings });
+        config.webhook = settings;
+        return { ok: true, webhook: { ...settings, url: settings.url.replace(/:[^:@]+@/, ':***@') } };
+      }
+      if (data.command === 'webhook-off') {
+        const { webhook: ignored, ...next } = config;
+        await write('config.json', next);
+        delete config.webhook;
+        return { ok: true };
+      }
+      if (data.command === 'webhook-test') {
+        if (!config.webhook?.url) throw new CommandError('Webhook não configurado. Configure a URL antes de testar.');
+        const res = await sendWebhook(config.webhook, {
+          type: 'test',
+          project: { name: 'DevSync Teste' },
+          message: 'Notificação de teste do DevSync entregue com sucesso!'
+        });
+        if (!res?.ok) throw new CommandError('Falha no teste do webhook: ' + (res?.error || `status HTTP ${res?.status}`));
+        return { ok: true, status: res.status };
+      }
       if (data.command === 'clone') {
         if (typeof data.url !== 'string' || !/^https:\/\/github\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+(?:\.git)?\/?$/.test(data.url)) throw new CommandError('Informe uma URL HTTPS de repositório do GitHub, sem credenciais.');
         if (typeof data.path !== 'string' || !data.path.trim() || !path.isAbsolute(data.path.trim())) throw new CommandError('Informe o caminho absoluto da nova pasta de destino.');
@@ -102,7 +140,7 @@ export async function daemon() {
         catch { throw new CommandError('Não foi possível clonar. Confira o repositório, rede e autenticação do Git. O clone parcial, se existir, foi preservado.'); }
         return perform({ command: 'add', path: destination }, source);
       }
-      if (!['add', 'sync', 'diff', 'stash-sync', 'pause', 'resume', 'push-on', 'push-off', 'checkpoint-on', 'checkpoint-off', 'settings'].includes(data.command)) throw new CommandError('Comando desconhecido.');
+      if (!['add', 'sync', 'diff', 'stash-sync', 'predict-conflicts', 'pause', 'resume', 'push-on', 'push-off', 'checkpoint-on', 'checkpoint-off', 'settings'].includes(data.command)) throw new CommandError('Comando desconhecido.');
       if (data.command === 'add') {
         if (typeof data.path !== 'string' || !data.path.trim()) throw new CommandError('Informe o caminho da pasta do projeto.');
         const folder = data.path.trim().replace(/^"(.*)"$/, '$1');
@@ -129,6 +167,10 @@ export async function daemon() {
       if (data.command === 'diff') {
         try { return await inspectDiff(repo); }
         catch (error) { throw new CommandError(error.message || 'Não foi possível inspecionar as alterações do projeto.'); }
+      }
+      if (data.command === 'predict-conflicts') {
+        try { return await predictConflicts(repo); }
+        catch (error) { throw new CommandError(error.message || 'Não foi possível prever conflitos.'); }
       }
       if (data.command === 'stash-sync') {
         if (busy.has(repo.id)) throw new CommandError('Projeto já está sincronizando. Aguarde a operação terminar.');
@@ -189,7 +231,15 @@ export async function daemon() {
           return res.end(content);
         }
         if (req.headers.authorization !== `Bearer ${token}`) return json(401, { error: 'Token inválido.' });
-        if (req.method === 'GET' && req.url === '/api/status') return json(200, { projects: projectStatus(), remote: { ...remote.status(), ...(config.remote ? { url: config.remote.url, name: config.remote.name, deviceId: config.remote.deviceId } : {}) } });
+        if (req.method === 'GET' && req.url === '/api/status') return json(200, {
+          projects: projectStatus(),
+          remote: { ...remote.status(), ...(config.remote ? { url: config.remote.url, name: config.remote.name, deviceId: config.remote.deviceId } : {}) },
+          webhook: config.webhook ? { enabled: config.webhook.enabled, service: config.webhook.service, url: config.webhook.url.replace(/:[^:@]+@/, ':***@'), chatId: config.webhook.chatId } : null
+        });
+        if (req.method === 'GET' && req.url === '/api/metrics') {
+          const historyEntries = history.query({ limit: 500 }).entries;
+          return json(200, calculateMetrics(historyEntries, config.projects));
+        }
         if (req.method === 'GET' && new URL(req.url, `http://${authority}`).pathname === '/api/history') {
           const query = new URL(req.url, `http://${authority}`).searchParams;
           try { return json(200, history.query({ projectId: query.get('projectId') || undefined, limit: query.has('limit') ? Number(query.get('limit')) : 100 })); }

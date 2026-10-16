@@ -1,6 +1,6 @@
 ---
 tipo: projeto
-versao: "0.4.0"
+versao: "0.5.0"
 atualizado: 2026-10-16
 tags: [devsync, projeto]
 cssclasses: [devsync]
@@ -8,49 +8,39 @@ fontes: ["package.json","docs/VALIDATION.md"]
 ---
 # ✅ Estado e limites
 
-Esta nota registra o estado observado em **16/10/2026**, na versão **0.4.0**.
+Esta nota registra o estado observado em **16/10/2026**, na versão **0.5.0**.
 
 ## Implementado
 
-- Serviço local, painel com Dark/Light Mode, CLI e desktop Windows com bandeja e ícone oficial.
-- Servidor MCP nativo (`devsync mcp`) para orquestração por agentes de IA (Claude, Cursor, Antigravity).
-- Sincronização em lote (`Sync All`) via UI, bandeja do Windows e terminal.
-- Visualizador de Diffs seguro com realce sintático e ocultação de arquivos sensíveis.
-- Stash Seguro + Sincronizar (preserva rascunhos locais, avança por fast-forward e restaura o stash).
-- Suporte a persistência transacional SQLite no Coordenador via `node:sqlite` nativo.
-- Cadastro de clone existente, clonagem pelo GitHub e diagnóstico de repositório.
-- Recebimento por fast-forward e push optativo.
-- Checkpoints optativos com mensagens semânticas inteligentes de commit e proteção a segredos.
-- Intervalos configuráveis por projeto.
-- Histórico persistente de até 1.000 eventos.
-- Coordenador com pareamento, fila persistente e revogação.
-- Atualizador optativo com download e instalação separados.
-- Arquivos de implantação para VPS e Render.
+- **Notificações Externas Multi-Canal (Webhooks):** Integração com Discord (embeds com cores semânticas), Telegram (markdown estruturado com chat_id) e Genérico (JSON POST HTTP/HTTPS) com controle de timeout e teste ao vivo.
+- **Painel de Métricas de Produtividade & Heatmap:** Cálculo de total de sincronizações, taxa de sucesso, commits transferidos, estimativa de horas de trabalho economizadas e histograma de atividade dos últimos 7 dias.
+- **Simulador de Conflitos em Memória (`predictConflicts`):** Simulação sem mutação de arquivos no disco usando `git merge-tree` e `git merge-base`, com exibição de diff de conflito (`<<<<<<<`) e identificação exata dos arquivos em conflito.
+- **Diagnóstico Aprofundado de Credenciais:** Verificação no onboarding de chaves SSH (`git@`) e auxiliares de credenciais (`credential.helper`) prevenindo bloqueios por senha no serviço em background.
+- **Coordenador PWA Responsivo:** Web App Manifest (`/manifest.json`), meta tags para mobile, touch targets otimizados e layout em cartões responsivos para celular e tablet.
+- **Serviço local e UI Desktop com Dark/Light Mode:** Electron tray com menu rápido de sincronização em lote e ícone nativo.
+- **Servidor MCP Nativo (`devsync mcp`):** 9 ferramentas para conexão direta com Claude Code, Cursor e Antigravity via stdio.
+- **Sincronização em Lote (`Sync All`):** Disponível na UI local, CLI e MCP.
+- **Visualizador Seguro de Diffs:** Ocultação automática de segredos e realce sintático.
+- **Safe Stash + Sync:** Preserva trabalho em andamento, atualiza por fast-forward e restaura o stash.
+- **Persistência Transacional SQLite no Coordenador:** Motor `node:sqlite` nativo sem bibliotecas C++ externas.
+- **Checkpoints Optativos Inteligentes:** Mensagens semânticas automáticas e proteção a segredos.
 
 ## Evidência da entrega
 
-O relatório do projeto registra **42 testes aprovados (100% verde)**, smoke do executável empacotado e auditoria de produção.
+A suíte completa de testes conta com **50 testes aprovados (100% verde)** sem falhas, cobrindo sincronização, conflitos, webhooks, métricas, protocolo MCP, coordinator SQLite, service lock e atualizações.
 
-## Preparado, mas dependente de publicação
+## Repositório e Lançamentos
 
-| Item | Pendência |
+| Recurso | Detalhes |
 | --- | --- |
-| Painel remoto pela internet | Escolher host, publicar com HTTPS e persistência |
-| Fonte de atualizações | Publicar manifesto, instalador e blockmap em HTTPS |
-| Sincronização do próprio código DevSync entre PCs | **Configurado** (repositório remoto conectado em `https://github.com/Henrique1601/devsync`) |
-
-## Ainda não comprovado em ambiente real
-
-- Instalação e uso nos dois computadores do usuário.
-- Autenticação real dos projetos privados no GitHub.
-- Autostart após reiniciar o Windows.
-- Atualização completa substituindo uma instalação anterior.
-- Containers executados no Docker local: o engine Linux estava inativo.
+| Repositório GitHub Oficial | `https://github.com/Henrique1601/devsync` |
+| Releases Geradas | `v0.3.0`, `v0.4.0` e `v0.5.0` |
+| Binários Compilados | Instalador NSIS (`.exe`) e Versão Portátil (`.exe`) |
+| Pipeline de CI/CD | GitHub Actions com testes e compilação automatizada |
 
 ## Limites do produto
 
-Não resolve conflitos automaticamente; não sincroniza arquivos não salvos; não inclui arquivos novos em checkpoints; não suporta persistência distribuída com múltiplas instâncias. O instalador ainda não possui assinatura de publicador.
-
-Próximas ações: [[01 Projeto/Roadmap]]. Evidências e critérios: [[03 Engenharia/Ambiente e validacao]].
+- A reconciliação automática ainda é restrita a avanço direto (fast-forward) por política estrita de preservação do trabalho.
+- O simulador de conflitos alerta antecipadamente, mas a resolução final da divergência deve ser realizada pelo desenvolvedor via Git quando houver linhas conflitantes.
 
 ← [[00 Comece aqui]]

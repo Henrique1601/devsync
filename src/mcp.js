@@ -80,6 +80,21 @@ export const MCP_TOOLS = [
       required: ['id', 'action'],
       additionalProperties: false
     }
+  },
+  {
+    name: 'devsync_metrics',
+    description: 'Obtém estatísticas de produtividade, taxa de sucesso, commits transferidos, horas economizadas e atividade dos últimos 7 dias.',
+    inputSchema: { type: 'object', properties: {}, additionalProperties: false }
+  },
+  {
+    name: 'devsync_predict_conflicts',
+    description: 'Simula em memória (sem alterar a árvore de trabalho) se a reconciliação com o upstream gerará conflitos no Git.',
+    inputSchema: {
+      type: 'object',
+      properties: { id: { type: 'string', description: 'ID ou nome do projeto cadastrado.' } },
+      required: ['id'],
+      additionalProperties: false
+    }
   }
 ];
 
@@ -101,6 +116,8 @@ export async function executeMcpTool(name, args = {}, { callDaemon = defaultDaem
   switch (name) {
     case 'devsync_status':
       return callDaemon('status');
+    case 'devsync_metrics':
+      return callDaemon('metrics');
     case 'devsync_sync':
       if (!args.id) throw new Error('Informe o parâmetro id.');
       return callDaemon('command', { command: 'sync', id: String(args.id) });
@@ -109,6 +126,9 @@ export async function executeMcpTool(name, args = {}, { callDaemon = defaultDaem
     case 'devsync_diff':
       if (!args.id) throw new Error('Informe o parâmetro id.');
       return callDaemon('command', { command: 'diff', id: String(args.id) });
+    case 'devsync_predict_conflicts':
+      if (!args.id) throw new Error('Informe o parâmetro id.');
+      return callDaemon('command', { command: 'predict-conflicts', id: String(args.id) });
     case 'devsync_stash_sync':
       if (!args.id) throw new Error('Informe o parâmetro id.');
       return callDaemon('command', { command: 'stash-sync', id: String(args.id), pop: args.pop !== false });
@@ -142,7 +162,7 @@ export async function handleMcpMessage(message, deps = {}) {
         result: {
           protocolVersion: message.params?.protocolVersion || '2024-11-05',
           capabilities: { tools: {} },
-          serverInfo: { name: 'devsync-mcp', version: '0.4.0' }
+          serverInfo: { name: 'devsync-mcp', version: '0.5.0' }
         }
       };
     }

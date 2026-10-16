@@ -28,6 +28,11 @@ export async function diagnose(folder) {
   result.identity.nameConfigured = await git(root, 'config', '--get', 'user.name').then(Boolean, () => false);
   result.identity.emailConfigured = await git(root, 'config', '--get', 'user.email').then(Boolean, () => false);
   check('identity', result.identity.nameConfigured && result.identity.emailConfigured, result.identity.nameConfigured && result.identity.emailConfigured ? 'Identidade de commit configurada.' : 'Identidade de commit incompleta.', 'Nesta pasta, configure git config user.name "Seu nome" e git config user.email "seu@email" antes de ativar checkpoints.');
-  result.ready = result.checks.filter(item => item.id !== 'identity').every(item => item.ok);
+  const credHelper = await git(root, 'config', '--get', 'credential.helper').catch(() => null);
+  const remoteUrl = await git(root, 'config', '--get', 'remote.origin.url').catch(() => '');
+  const usesSsh = remoteUrl.startsWith('git@') || remoteUrl.startsWith('ssh://');
+  const authOk = usesSsh || Boolean(credHelper);
+  check('credentials', authOk, authOk ? (usesSsh ? 'Autenticação via chave SSH detectada.' : `Auxiliar de credenciais Git ativo (${credHelper}).`) : 'Nenhum auxiliar de credenciais Git configurado.', 'Recomendado: configure git config --global credential.helper manager para não travar pedidos de senha no serviço em segundo plano.');
+  result.ready = result.checks.filter(item => !['identity', 'credentials'].includes(item.id)).every(item => item.ok);
   return result;
 }

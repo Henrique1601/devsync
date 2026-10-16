@@ -128,3 +128,53 @@ export async function synchronize(repo) {
     throw error;
   } finally { await rm(lock, { recursive: true, force: true }); }
 }
+
+export async function predictConflicts(repo) {
+  const status = await inspect(repo);
+  if (!status.upstream) return { possible: true, conflicts: [], message: 'Upstream não configurado.' };
+  if (!status.ahead && !status.behind) return { possible: true, conflicts: [], message: 'Repositório sincronizado com o upstream.' };
+  if (!status.ahead && status.behind) return { possible: true, conflicts: [], message: 'Avanço direto (fast-forward) limpo, sem nenhum conflito.' };
+  if (status.ahead && !status.behind) return { possible: true, conflicts: [], message: 'Commits locais prontos para envio (push).' };
+
+  try {
+    const base = await git(repo.path, 'merge-base', 'HEAD', '@{u}');
+    const treeOutput = await gitRaw(repo.path, 'merge-tree', base, 'HEAD', '@{u}');
+    const conflicts = [];
+    const lines = treeOutput.split(/\r?\n/);
+    let inConflict = false;
+    const previewLines = [];
+
+    for (const line of lines) {
+      const match = line.match(/^\s*(?:base|our|their)\s+\d+\s+[a-f0-9]+\s+(.+)$/);
+      if (match) {
+        const fileName = match[1].trim();
+        if (fileName && !conflicts.some(c => c.file === fileName)) {
+          conflicts.push({ file: fileName, details: 'Alterado em ambos os lados' });
+        }
+      } else if (line.startsWith('conflict in ')) {
+        const fileName = line.slice('conflict in '.length).trim();
+        if (fileName && !conflicts.some(c => c.file === fileName)) {
+          conflicts.push({ file: fileName, details: line });
+        }
+      } else if (line.includes('<<<<<<<')) {
+        inConflict = true;
+        if (previewLines.length < 30) previewLines.push(line);
+      } else if (inConflict) {
+        if (previewLines.length < 30) previewLines.push(line);
+        if (line.includes('>>>>>>>')) inConflict = false;
+      }
+    }
+
+    return {
+      possible: conflicts.length === 0,
+      conflicts,
+      preview: previewLines.join('\n'),
+      message: conflicts.length === 0
+        ? 'Divergência pode ser reconciliada automaticamente sem conflitos de linhas.'
+        : `Conflito previsto em ${conflicts.length} arquivo(s): ${conflicts.map(c => c.file).join(', ')}.`
+    };
+  } catch (error) {
+    return { possible: false, conflicts: [], message: 'Previsão indisponível: ' + error.message };
+  }
+}
+
