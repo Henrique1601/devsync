@@ -52,7 +52,12 @@ async function openPredictConflicts(id,name){
       const list=el('div',undefined,'file-list');
       for(const c of res.conflicts){
         const chip=el('div',undefined,'file-chip file-sensitive');
-        chip.append(el('code',c.file),el('span',c.details||'Conflito'));
+        const fileBox=el('div');
+        fileBox.append(el('code',c.file),el('span',` (${c.details||'Conflito'})`,'hint'));
+        const resolveBtn=el('button','Resolver com IA','primary');
+        resolveBtn.type='button';
+        resolveBtn.onclick=()=>openAiResolver(id,c.file,body);
+        chip.append(fileBox,resolveBtn);
         list.append(chip);
       }
       body.append(list);
@@ -67,7 +72,63 @@ async function openPredictConflicts(id,name){
     }
   }catch(e){body.replaceChildren(el('p',e.message))}
 }
+async function openAiResolver(id,file,container){
+  const host=el('div');
+  host.append(el('h3','Resolução 3-Way Assistida por IA: '+file));
+  host.append(el('p','Analisando alterações com inteligência semântica…'));
+  container.append(host);
+  try{
+    const res=await api('command',{command:'ai-resolve',id,file});
+    host.replaceChildren();
+    host.append(el('h3','Resolução: '+file));
+    const badge=el('span',res.strategy==='gemini-ai'?'Estratégia: Gemini AI':'Estratégia: Heurística Semântica','badge');
+    host.append(badge);
+    if(res.changes?.length)host.append(el('p','Modificações: '+res.changes.join(', ')));
+    const grid=el('div',undefined,'merge-grid');
+    const pane1=el('div',undefined,'merge-pane');pane1.append(el('h4','Seu Código Local (HEAD)'));pane1.append(el('div',res.localCode||'(vazio)','merge-readonly'));
+    const pane2=el('div',undefined,'merge-pane');pane2.append(el('h4','Código Remoto (Incoming)'));pane2.append(el('div',res.remoteCode||'(vazio)','merge-readonly'));
+    const pane3=el('div',undefined,'merge-pane');pane3.append(el('h4','Código Mesclado (Editável)'));
+    const editor=el('textarea',undefined,'merge-editor');editor.value=res.resolvedCode||'';pane3.append(editor);
+    grid.append(pane1,pane2,pane3);host.append(grid);
+    const actions=el('div',undefined,'actions');
+    const applyBtn=el('button','Aplicar Resolução no Arquivo','primary');applyBtn.type='button';
+    applyBtn.onclick=async()=>{
+      applyBtn.disabled=true;
+      try{
+        await api('command',{command:'resolve-conflict',id,file,resolvedCode:editor.value});
+        notice('Arquivo '+file+' resolvido e salvo com sucesso!');
+        host.replaceChildren(el('div','✓ Conflito resolvido e gravado no repositório.','conflict-ok'));
+      }catch(err){notice(err.message)}finally{applyBtn.disabled=false}
+    };
+    actions.append(applyBtn);host.append(actions);
+  }catch(err){host.replaceChildren(el('p','Erro na resolução com IA: '+err.message,'hint'))}
+}
+async function openSecretScanner(id,name){
+  const modal=$('#secrets-modal'),body=$('#secrets-body'),title=$('#secrets-title');
+  if(!modal||!body)return;
+  title.textContent='Varredura de Segredos: '+name;
+  body.replaceChildren(el('p','Escaneando código e diffs em busca de credenciais e chaves…'));
+  if(typeof modal.showModal==='function')modal.showModal();else modal.removeAttribute('hidden');
+  try{
+    const res=await api('command',{command:'scan-secrets',id});
+    body.replaceChildren();
+    if(!res.findings?.length){
+      body.append(el('div','✓ Repositório Seguro! Nenhuma credencial, token ou chave privada foi encontrada nas alterações locais.','secret-safe'));
+    }else{
+      const warn=el('div',undefined,'conflict-warn');
+      warn.append(el('strong',`⚠️ ${res.found} segredo(s) detectado(s)!`),el('p','O DevSync bloqueia checkpoints automáticos quando segredos são detectados para prevenir vazamentos para o GitHub/remoto. Remova ou mascare as chaves:'));
+      body.append(warn);
+      for(const item of res.findings){
+        const row=el('div',undefined,'secret-item');
+        row.append(el('strong',`${item.rule}: ${item.file}`));
+        row.append(el('p',`Linha/Trecho: ${item.masked}`,'hint'));
+        body.append(row);
+      }
+    }
+  }catch(e){body.replaceChildren(el('p',e.message))}
+}
 $('#conflict-close')?.addEventListener('click',()=>{const m=$('#conflict-modal');if(typeof m?.close==='function')m.close();else m?.setAttribute('hidden','')});
+$('#secrets-close')?.addEventListener('click',()=>{const m=$('#secrets-modal');if(typeof m?.close==='function')m.close();else m?.setAttribute('hidden','')});
 async function openDiff(id,name){
   const modal=$('#diff-modal'),body=$('#diff-body'),title=$('#diff-title');
   if(!modal||!body)return;
@@ -111,7 +172,7 @@ function field(parent,id,label,type,value,attrs={}){const box=el('div'),title=el
 function card(project){
   const node=el('section'),top=el('div',undefined,'project-top'),title=el('div'),status=el('span',undefined,'status');title.append(el('h3',project.name),el('code',project.path));top.append(title,status);
   const meta=el('p',undefined,'project-meta'),reason=el('p',undefined,'project-reason'),controls=el('div',undefined,'actions'),buttons={};
-  for(const key of ['sync','diff','predict','stash','pause','push','checkpoint']){const b=el('button');b.type='button';buttons[key]=b;controls.append(b)}
+  for(const key of ['sync','diff','predict','stash','secrets','pause','push','checkpoint']){const b=el('button');b.type='button';buttons[key]=b;controls.append(b)}
   const details=el('details');details.append(el('summary','Regras de sincronização e checkpoints'));const form=el('form',undefined,'grid');
   const interval=field(form,'interval-'+project.id,'Verificar a cada (segundos)','number',project.syncIntervalSeconds??30,{min:15,max:3600,required:''});
   const delay=field(form,'delay-'+project.id,'Esperar sem alterações (segundos)','number',project.checkpointDelaySeconds??60,{min:30,max:3600,required:''});
@@ -128,6 +189,7 @@ function card(project){
     buttons.diff.textContent='Ver alterações';buttons.diff.disabled=p.busy;buttons.diff.onclick=()=>openDiff(p.id,p.name);
     buttons.predict.textContent='Simular conflitos';buttons.predict.disabled=p.busy;buttons.predict.onclick=()=>openPredictConflicts(p.id,p.name);
     buttons.stash.textContent='Stash + Sincronizar';buttons.stash.hidden=p.state!=='dirty';buttons.stash.disabled=p.busy;buttons.stash.onclick=()=>command('stash-sync',p.id,{pop:true});
+    buttons.secrets.textContent='Escanear segredos';buttons.secrets.disabled=p.busy;buttons.secrets.onclick=()=>openSecretScanner(p.id,p.name);
     const actions={sync:['sync','Sincronizar agora'],pause:[p.paused?'resume':'pause',p.paused?'Retomar':'Pausar'],push:[p.autoPush?'push-off':'push-on',p.autoPush?'Desativar envio':'Ativar envio de commits'],checkpoint:[p.checkpoint?'checkpoint-off':'checkpoint-on',p.checkpoint?'Desativar checkpoints':'Ativar checkpoints']};
     for(const[k,[action,text]]of Object.entries(actions)){buttons[k].textContent=text;buttons[k].disabled=p.busy;buttons[k].onclick=()=>command(action,p.id)}
   }

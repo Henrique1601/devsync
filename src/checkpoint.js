@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { git, gitRaw } from './git.js';
 import { rulesFor, matchesInclude } from './rules.js';
+import { scanDiff } from './secrets.js';
 const quiet = new Map();
 
 export const SENSITIVE_FILE_PATTERN = /(^|[\/\\])(?:\.env(?:\..*)?|\.npmrc|\.pypirc|\.netrc|.*\.(?:pem|key|p12|pfx)|(?:credentials|secrets|tokens)(?:\..*)?|id_(?:rsa|ed25519|ecdsa|dsa)|\.(?:ssh|aws)(?:[\/\\].*)?)$/i;
@@ -21,7 +22,13 @@ export async function checkpoint(repo, status) {
   const files = changed.split('\0').filter(file => file && tracked.has(file) && matchesInclude(file, rulesFor(repo).checkpointInclude));
   if (!files.length) { quiet.delete(repo.path); return false; }
   if (files.some(file => SENSITIVE_FILE_PATTERN.test(file))) throw new Error('Checkpoint bloqueado: arquivo sensível alterado. Revise e faça o commit manualmente.');
-  const fingerprint = createHash('sha256').update(await gitRaw(repo.path, '--literal-pathspecs', 'diff', 'HEAD', '--', ...files)).digest('hex');
+  const diffText = await gitRaw(repo.path, '--literal-pathspecs', 'diff', 'HEAD', '--', ...files);
+  const secretScan = scanDiff(diffText);
+  if (!secretScan.safe) {
+    const leakDesc = secretScan.leaks.map(l => `${l.type} em ${l.file}`).join(', ');
+    throw new Error(`Checkpoint bloqueado: segredo detectado (${leakDesc}). Revise antes de commitar.`);
+  }
+  const fingerprint = createHash('sha256').update(diffText).digest('hex');
   const previous = quiet.get(repo.path);
   if (!previous || previous.fingerprint !== fingerprint) quiet.set(repo.path, { fingerprint, since: Date.now() });
   const delay = repo.checkpointDelayMs ?? rulesFor(repo).checkpointDelaySeconds * 1000;

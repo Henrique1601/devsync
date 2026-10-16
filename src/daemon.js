@@ -1,12 +1,14 @@
 import http from 'node:http';
 import { randomBytes } from 'node:crypto';
-import { mkdir, rm, realpath, readFile } from 'node:fs/promises';
+import { mkdir, rm, realpath, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { home, read, write } from './store.js';
 import { git, inspect, inspectDiff, predictConflicts, stashAndSync, synchronize } from './git.js';
 import { validateWebhookSettings, sendWebhook } from './webhooks.js';
 import { calculateMetrics } from './metrics.js';
+import { scanDiff } from './secrets.js';
+import { resolveConflictAI } from './ai.js';
 import { startRemote, validateRemote } from './remote-client.js';
 import { acquireServiceLock } from './service-lock.js';
 import { rulesFor, validateRules, isSyncDue } from './rules.js';
@@ -140,7 +142,7 @@ export async function daemon() {
         catch { throw new CommandError('Não foi possível clonar. Confira o repositório, rede e autenticação do Git. O clone parcial, se existir, foi preservado.'); }
         return perform({ command: 'add', path: destination }, source);
       }
-      if (!['add', 'sync', 'diff', 'stash-sync', 'predict-conflicts', 'pause', 'resume', 'push-on', 'push-off', 'checkpoint-on', 'checkpoint-off', 'settings'].includes(data.command)) throw new CommandError('Comando desconhecido.');
+      if (!['add', 'sync', 'diff', 'stash-sync', 'predict-conflicts', 'scan-secrets', 'ai-resolve', 'resolve-conflict', 'pause', 'resume', 'push-on', 'push-off', 'checkpoint-on', 'checkpoint-off', 'settings'].includes(data.command)) throw new CommandError('Comando desconhecido.');
       if (data.command === 'add') {
         if (typeof data.path !== 'string' || !data.path.trim()) throw new CommandError('Informe o caminho da pasta do projeto.');
         const folder = data.path.trim().replace(/^"(.*)"$/, '$1');
@@ -171,6 +173,50 @@ export async function daemon() {
       if (data.command === 'predict-conflicts') {
         try { return await predictConflicts(repo); }
         catch (error) { throw new CommandError(error.message || 'Não foi possível prever conflitos.'); }
+      }
+      if (data.command === 'scan-secrets') {
+        try {
+          const diffData = await inspectDiff(repo);
+          const scan = scanDiff(diffData.diff);
+          return {
+            safe: scan.safe,
+            found: scan.leaks.length,
+            findings: scan.leaks.map(l => ({ rule: l.type, file: l.file, masked: l.preview })),
+            leaks: scan.leaks
+          };
+        } catch (error) { throw new CommandError(error.message || 'Não foi possível verificar segredos.'); }
+      }
+      if (data.command === 'ai-resolve') {
+        if (!data.file || typeof data.file !== 'string') throw new CommandError('Informe o arquivo em conflito.');
+        try {
+          let fileContent = '';
+          try { fileContent = await readFile(path.resolve(repo.path, data.file), 'utf8'); } catch {}
+          let ours = '', theirs = '', base = '';
+          if (fileContent.includes('<<<<<<<')) {
+            const parts = fileContent.split(/<<<<<<<.*?\r?\n/);
+            if (parts[1]) {
+              const sub = parts[1].split(/=======\r?\n/);
+              ours = sub[0] || '';
+              theirs = (sub[1] || '').split(/>>>>>>>.*?\r?\n/)[0] || '';
+            }
+          }
+          if (!ours && !theirs) {
+            ours = fileContent;
+            const conf = await predictConflicts(repo);
+            theirs = conf.preview || '';
+          }
+          return await resolveConflictAI({ file: data.file, ours, theirs, base });
+        } catch (error) { throw new CommandError(error.message || 'Não foi possível gerar resolução com IA.'); }
+      }
+      if (data.command === 'resolve-conflict') {
+        if (!data.file || typeof data.resolvedCode !== 'string') throw new CommandError('Informe o arquivo e o código resolvido.');
+        const targetPath = path.resolve(repo.path, data.file);
+        if (!targetPath.toLowerCase().startsWith(path.resolve(repo.path).toLowerCase())) throw new CommandError('Caminho de arquivo inválido.');
+        try {
+          await writeFile(targetPath, data.resolvedCode, 'utf8');
+          await git(repo.path, 'add', '--', data.file);
+          return { ok: true, file: data.file };
+        } catch (error) { throw new CommandError('Não foi possível salvar a resolução do conflito: ' + error.message); }
       }
       if (data.command === 'stash-sync') {
         if (busy.has(repo.id)) throw new CommandError('Projeto já está sincronizando. Aguarde a operação terminar.');

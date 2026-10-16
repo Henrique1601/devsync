@@ -1,6 +1,6 @@
 ---
 tipo: referencia
-versao: "0.5.0"
+versao: "0.6.0"
 atualizado: 2026-10-16
 tags: [devsync, referencia]
 cssclasses: [devsync]
@@ -16,6 +16,13 @@ Execute na pasta do DevSync, com Node.js 22+ e Git. O serviço precisa estar ati
 Set-Location "C:/Users/henri/Programacao/Projetos/devsync"
 npm start
 ```
+
+## Atalhos Globais de Teclado (Windows Desktop)
+
+| Atalho | Ação |
+| --- | --- |
+| `Ctrl+Shift+S` | Dispara a sincronização de todos os projetos ativos com notificação |
+| `Ctrl+Shift+D` | Abre / foca a janela principal do DevSync |
 
 ## Consultar e cadastrar
 
@@ -47,6 +54,16 @@ node src/cli.js checkpoint-off ID_DO_PROJETO
 node src/cli.js settings ID_DO_PROJETO 30 60 "src/**,README.md"
 ```
 
+## Varredura de Segredos e Resolução com IA
+
+```powershell
+# Escanear diff e alterações em busca de chaves/tokens
+node src/cli.js scan-secrets ID_DO_PROJETO
+
+# Resolver conflito em arquivo com inteligência artificial / heurística
+node src/cli.js ai-resolve ID_DO_PROJETO caminho/do/arquivo.js
+```
+
 ## Webhooks e Notificações
 
 ```powershell
@@ -58,7 +75,7 @@ node src/cli.js webhook-off
 
 ## Servidor MCP (Agentes de IA)
 
-Para conectar ferramentas como Claude Code, Cursor ou Antigravity:
+Para conectar ferramentas como Claude Code, Cursor ou Antigravity via stdio com as 12 ferramentas disponíveis:
 
 ```powershell
 node src/cli.js mcp

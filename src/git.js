@@ -109,7 +109,7 @@ export async function synchronize(repo) {
     const remote = await git(repo.path, 'config', '--get', `branch.${repo.branch}.remote`);
     const target = await git(repo.path, 'config', '--get', `branch.${repo.branch}.merge`);
     if (!remote || remote === '.' || remote.startsWith('-') || !target.startsWith('refs/heads/')) throw new Error('Configure um upstream remoto válido.');
-    await git(repo.path, 'fetch', '--', remote);
+    await git(repo.path, 'fetch', '--tags', '--', remote);
     status = await inspect(repo);
     if (['dirty', 'branch-changed', 'detached', 'operation', 'diverged'].includes(status.state)) return { ...status, ...activity };
     if (status.behind) {
@@ -120,6 +120,9 @@ export async function synchronize(repo) {
     status = await inspect(repo);
     if (repo.autoPush && status.state === 'ahead') {
       await git(repo.path, 'push', '--', remote, `HEAD:${target}`);
+      if (repo.syncTags) {
+        await git(repo.path, 'push', '--tags', '--', remote).catch(() => {});
+      }
       activity.sentCommits = status.ahead;
     }
     return { ...await inspect(repo), ...activity };

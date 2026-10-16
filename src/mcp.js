@@ -95,6 +95,43 @@ export const MCP_TOOLS = [
       required: ['id'],
       additionalProperties: false
     }
+  },
+  {
+    name: 'devsync_scan_secrets',
+    description: 'Analisa arquivos modificados do projeto contra vazamento de credenciais, chaves de API, senhas ou tokens privados.',
+    inputSchema: {
+      type: 'object',
+      properties: { id: { type: 'string', description: 'ID ou nome do projeto cadastrado.' } },
+      required: ['id'],
+      additionalProperties: false
+    }
+  },
+  {
+    name: 'devsync_ai_resolve_conflict',
+    description: 'Gera uma proposta semântica de resolução com IA ou heurística para um arquivo em conflito.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        id: { type: 'string', description: 'ID ou nome do projeto.' },
+        file: { type: 'string', description: 'Caminho relativo do arquivo em conflito.' }
+      },
+      required: ['id', 'file'],
+      additionalProperties: false
+    }
+  },
+  {
+    name: 'devsync_resolve_conflict',
+    description: 'Aplica o código resolvido diretamente a um arquivo em conflito e marca a resolução via git add.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        id: { type: 'string', description: 'ID ou nome do projeto.' },
+        file: { type: 'string', description: 'Caminho relativo do arquivo em conflito.' },
+        resolvedCode: { type: 'string', description: 'Conteúdo final reconciliado do arquivo.' }
+      },
+      required: ['id', 'file', 'resolvedCode'],
+      additionalProperties: false
+    }
   }
 ];
 
@@ -129,6 +166,15 @@ export async function executeMcpTool(name, args = {}, { callDaemon = defaultDaem
     case 'devsync_predict_conflicts':
       if (!args.id) throw new Error('Informe o parâmetro id.');
       return callDaemon('command', { command: 'predict-conflicts', id: String(args.id) });
+    case 'devsync_scan_secrets':
+      if (!args.id) throw new Error('Informe o parâmetro id.');
+      return callDaemon('command', { command: 'scan-secrets', id: String(args.id) });
+    case 'devsync_ai_resolve_conflict':
+      if (!args.id || !args.file) throw new Error('Informe id e file.');
+      return callDaemon('command', { command: 'ai-resolve', id: String(args.id), file: String(args.file) });
+    case 'devsync_resolve_conflict':
+      if (!args.id || !args.file || typeof args.resolvedCode !== 'string') throw new Error('Informe id, file e resolvedCode.');
+      return callDaemon('command', { command: 'resolve-conflict', id: String(args.id), file: String(args.file), resolvedCode: args.resolvedCode });
     case 'devsync_stash_sync':
       if (!args.id) throw new Error('Informe o parâmetro id.');
       return callDaemon('command', { command: 'stash-sync', id: String(args.id), pop: args.pop !== false });
@@ -162,7 +208,7 @@ export async function handleMcpMessage(message, deps = {}) {
         result: {
           protocolVersion: message.params?.protocolVersion || '2024-11-05',
           capabilities: { tools: {} },
-          serverInfo: { name: 'devsync-mcp', version: '0.5.0' }
+          serverInfo: { name: 'devsync-mcp', version: '0.6.0' }
         }
       };
     }

@@ -26,6 +26,8 @@ try {
   devsync diagnose <pasta>               Verifica Git e configuração
   devsync diff <id>                      Exibe arquivos alterados e diff seguro
   devsync predict-conflicts <id>         Simula em memória se haverá conflitos no Git
+  devsync scan-secrets <id>              Analisa arquivos alterados contra vazamento de chaves
+  devsync ai-resolve <id> <arquivo>      Gera resolução semântica do conflito usando IA
   devsync settings <id> <intervalo> <espera> <padrões separados por vírgula>
   devsync sync <id>                       Sincroniza projeto agora (ou --all para todos)
   devsync sync-all                       Sincroniza todos os projetos ativos em lote
@@ -59,6 +61,8 @@ Checkpoints e envio são optativos e começam desativados.`);
         : normalized === 'check-remote' ? { command: normalized, url: argument }
         : normalized === 'webhook-config' ? { command: normalized, settings: { url: argument, service: extra, chatId: deviceId } }
         : ['webhook-test', 'webhook-off'].includes(normalized) ? { command: normalized }
+        : normalized === 'scan-secrets' ? { command: normalized, id: argument }
+        : normalized === 'ai-resolve' ? { command: normalized, id: argument, file: extra }
         : normalized === 'stash-sync' ? { command: normalized, id: argument, pop: extra !== '--no-pop' }
         : normalized === 'settings' ? { command: normalized, id: argument, ...(extra === undefined ? {} : { syncIntervalSeconds: Number(extra) }), ...(deviceId === undefined ? {} : { checkpointDelaySeconds: Number(deviceId) }), ...(name === undefined ? {} : { checkpointInclude: name.split(',').map(value => value.trim()) }) }
         : { command: normalized, path: argument, id: argument };

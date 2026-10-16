@@ -6,7 +6,7 @@ test('MCP server handles initialize, ping and tools/list', async () => {
   const init = await handleMcpMessage({ jsonrpc: '2.0', id: 1, method: 'initialize', params: {} });
   assert.equal(init.id, 1);
   assert.equal(init.result.serverInfo.name, 'devsync-mcp');
-  assert.equal(init.result.serverInfo.version, '0.5.0');
+  assert.equal(init.result.serverInfo.version, '0.6.0');
 
   const ping = await handleMcpMessage({ jsonrpc: '2.0', id: 2, method: 'ping' });
   assert.equal(ping.id, 2);
@@ -25,6 +25,9 @@ test('MCP server handles initialize, ping and tools/list', async () => {
   assert.ok(toolNames.includes('devsync_history'));
   assert.ok(toolNames.includes('devsync_metrics'));
   assert.ok(toolNames.includes('devsync_predict_conflicts'));
+  assert.ok(toolNames.includes('devsync_scan_secrets'));
+  assert.ok(toolNames.includes('devsync_ai_resolve_conflict'));
+  assert.ok(toolNames.includes('devsync_resolve_conflict'));
 });
 
 test('MCP server dispatches tools/call to daemon dependency injection', async () => {
@@ -62,11 +65,18 @@ test('MCP server dispatches tools/call to daemon dependency injection', async ()
   const diffOutput = JSON.parse(diffCall.result.content[0].text);
   assert.equal(diffOutput.files[0].path, 'app.js');
 
-  const errorCall = await handleMcpMessage(
-    { jsonrpc: '2.0', id: 13, method: 'tools/call', params: { name: 'unknown_tool', arguments: {} } },
+  const scanSecretsCall = await handleMcpMessage(
+    { jsonrpc: '2.0', id: 13, method: 'tools/call', params: { name: 'devsync_scan_secrets', arguments: { id: 'p1' } } },
     { callDaemon: fakeDaemon }
   );
-  assert.equal(errorCall.id, 13);
+  assert.equal(scanSecretsCall.id, 13);
+  assert.equal(scanSecretsCall.result.isError, false);
+
+  const errorCall = await handleMcpMessage(
+    { jsonrpc: '2.0', id: 14, method: 'tools/call', params: { name: 'unknown_tool', arguments: {} } },
+    { callDaemon: fakeDaemon }
+  );
+  assert.equal(errorCall.id, 14);
   assert.equal(errorCall.result.isError, true);
   assert.match(errorCall.result.content[0].text, /desconhecida/);
 });

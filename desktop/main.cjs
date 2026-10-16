@@ -1,10 +1,11 @@
-const { app, BrowserWindow, Tray, Menu, nativeImage, dialog, ipcMain, Notification, session } = require('electron');
+const { app, BrowserWindow, Tray, Menu, nativeImage, dialog, ipcMain, Notification, session, globalShortcut } = require('electron');
 const path = require('node:path');
 const { pathToFileURL } = require('node:url');
 const { deflateSync } = require('node:zlib');
 let window, tray, service, runtime, quitting = false, pollTimer, updateTimer, updateInitialTimer, updates, stopPromise;
 function stopOnce() {
   clearInterval(pollTimer); clearInterval(updateTimer); clearTimeout(updateInitialTimer);
+  try { globalShortcut?.unregisterAll(); } catch {}
   return stopPromise ||= Promise.resolve().then(() => service?.stop());
 }
 const smoke = process.argv.includes('--smoke-test');
@@ -83,7 +84,18 @@ else {
       const syncAllFromTray = async () => {
         try { await fetch(`http://127.0.0.1:${runtime.port}/api/command`, { method: 'POST', headers: { authorization: `Bearer ${runtime.token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ command: 'sync-all' }) }); } catch {}
       };
-      tray.setContextMenu(Menu.buildFromTemplate([{label:'Abrir DevSync',click:show},{label:'Sincronizar todos',click:syncAllFromTray},{type:'separator'},{label:'Sair',click:()=>app.quit()}]));tray.on('double-click',show);
+      try {
+        globalShortcut.register('CommandOrControl+Shift+S', async () => {
+          await syncAllFromTray();
+          if (Notification.isSupported()) {
+            new Notification({ title: 'DevSync', body: 'Sincronização global executada (Ctrl+Shift+S).' }).show();
+          }
+        });
+        globalShortcut.register('CommandOrControl+Shift+D', () => {
+          show();
+        });
+      } catch {}
+      tray.setContextMenu(Menu.buildFromTemplate([{label:'Abrir DevSync (Ctrl+Shift+D)',click:show},{label:'Sincronizar todos (Ctrl+Shift+S)',click:syncAllFromTray},{type:'separator'},{label:'Sair',click:()=>app.quit()}]));tray.on('double-click',show);
       const last = new Map(); let checking=false;
       pollTimer=setInterval(async()=>{if(checking)return;checking=true;try{const r=await fetch(`http://127.0.0.1:${runtime.port}/api/status`,{headers:{authorization:`Bearer ${runtime.token}`},signal:AbortSignal.timeout(5000)});if(!r.ok)return;const {projects}=await r.json();for(const p of projects){const previous=last.get(p.id);last.set(p.id,p.state);if(previous&&previous!==p.state&&['error','dirty','diverged','synced'].includes(p.state)&&Notification.isSupported())new Notification({title:'DevSync: '+p.name,body:p.state==='synced'?'Projeto sincronizado.':'O projeto precisa de atenção. Abra o DevSync para ver os detalhes.'}).show()}}catch{}finally{checking=false}},10000);
       if (!process.argv.includes('--background')) await show();
