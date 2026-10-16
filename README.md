@@ -1,6 +1,11 @@
-# DevSync 0.3
+# DevSync 0.4
 
-Sincronização Git entre seus PCs, com aplicativo de bandeja para Windows, CLI, painel local, coordenador remoto e checkpoints optativos. O GitHub transporta o código; o coordenador acompanha dispositivos e pedidos.
+[![CI](https://github.com/Henrique1601/devsync/actions/workflows/ci.yml/badge.svg)](https://github.com/Henrique1601/devsync/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/Henrique1601/devsync)](https://github.com/Henrique1601/devsync/releases)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Node.js](https://img.shields.io/badge/node-%3E%3D22-brightgreen.svg)](https://nodejs.org)
+
+Sincronização Git resiliente entre seus computadores (Casa e Trabalho), com aplicativo de bandeja para Windows, CLI, painel local com Dark/Light mode, servidor MCP para agentes de IA, coordenador remoto e checkpoints optativos. O GitHub transporta o código; o coordenador acompanha dispositivos e pedidos.
 
 ## Segundo cérebro no Obsidian
 
@@ -9,110 +14,89 @@ Abra a pasta `Segundo Cerebro DevSync` como cofre no Obsidian e comece por [00 C
 ## Usar o aplicativo Windows
 
 Baixe o executável diretamente na página de [**Releases no GitHub**](https://github.com/Henrique1601/devsync/releases):
-- **Instalador (`DevSync Setup 0.3.0.exe`):** Instala o aplicativo no Windows, cria atalhos e permite iniciar automaticamente com o sistema.
-- **Portátil (`DevSync 0.3.0 Portable.exe`):** Executável único que roda diretamente sem necessidade de instalação.
+- **Instalador (`DevSync.Setup.0.4.0.exe`):** Instala o aplicativo no Windows, cria atalhos no menu iniciar e suporta inicialização automática com o sistema.
+- **Portátil (`DevSync.0.4.0.Portable.exe`):** Executável único de arquivo único que roda diretamente sem necessidade de instalação.
 
-O aplicativo contém seu próprio runtime integrado; requer apenas Git instalado no computador e autenticação Git configurada. O instalador ainda não possui certificado de assinatura de um publicador comercial (ao abrir pela primeira vez, clique em *"Mais informações"* -> *"Executar assim mesmo"*).
+O aplicativo contém seu próprio runtime integrado; requer apenas Git instalado no computador e autenticação Git configurada. O instalador ainda não possui certificado de assinatura comercial (ao abrir pela primeira vez, clique em *"Mais informações"* -> *"Executar assim mesmo"*).
 
-Abra DevSync. Para um repositório já baixado, use **Selecionar pasta** e **Cadastrar**. Para baixar um novo, use **Clonar do GitHub**, informe a URL HTTPS e o caminho absoluto de uma nova pasta. O diretório pai precisa existir. Repositórios privados usam as credenciais já configuradas no Git.
+Abra o DevSync. Para um repositório já baixado, use **Selecionar pasta** e **Cadastrar**. Para baixar um novo, use **Clonar do GitHub**, informe a URL HTTPS e o caminho absoluto de uma nova pasta. Repositórios privados usam as credenciais já configuradas no Git.
 
-Cada projeto usa a branch ativa no cadastro e precisa de commits e upstream. Um clone normal do GitHub costuma configurar o upstream automaticamente. O cadastro informa quando isso estiver faltando.
+### Novidades da versão 0.4:
+- 🌙 **Tema Escuro & Claro:** Seletor de tema no topo com persistência local.
+- ⚡ **Sincronização em Lote (`Sync All`):** Botão no aplicativo, bandeja e terminal para atualizar todos os seus projetos de uma só vez.
+- 🔍 **Visualizador de Diffs Seguro:** Veja quais arquivos mudaram e commits pendentes com realce sintático, protegendo segredos (`.env`, `*.key`).
+- 📦 **Stash Seguro + Sincronizar:** Guarde alterações locais pendentes em Stash seguro, receba as novidades do outro PC por fast-forward e restaure o Stash automaticamente com 1 clique.
+- 🤖 **Servidor MCP Nativo:** Controle o DevSync diretamente por agentes de IA (Claude Code, Cursor, Antigravity) via stdio.
+- 🗄️ **Coordenador SQLite:** Suporte a banco transacional SQLite usando `node:sqlite` nativo (`DEVSYNC_COORDINATOR_STORAGE=sqlite`).
 
-Na tela **Configurar projeto**, use **Verificar configuração** para checar Git, pasta, repositório, branch, commits, upstream e identidade para checkpoints. O assistente informa como corrigir pendências sem alterar o Git ou pedir credenciais. Ele verifica a configuração local; a autenticação do remoto é verificada durante a sincronização.
+## Servidor MCP para Agentes de IA
 
-Fechar a janela mantém o aplicativo e o serviço na bandeja. Clique duas vezes no ícone para abrir. Use **Sair** no menu para encerrar. Selecione **Iniciar com o Windows** para iniciar na bandeja após entrar na sua conta. Isso é inicialização na sessão do usuário, e não um serviço Windows executado antes do login.
+Você pode conectar o DevSync como ferramenta para qualquer assistente ou agente compatível com Model Context Protocol (MCP).
 
-Se um serviço CLI já estiver ativo, o desktop conecta a ele. Nesse caso, sair do desktop não encerra o serviço externo. Para migrar ao desktop, encerre primeiro o terminal do serviço com Ctrl+C.
+No arquivo de configuração do seu cliente (ex: `claude_desktop_config.json` ou Cursor/Antigravity):
 
-## Executar pelo código
-
-Requisitos: Node.js 22+ e Git. Serviço, CLI e coordenador usam somente módulos nativos e funcionam sem instalar dependências npm.
-
-```powershell
-npm start
+```json
+{
+  "mcpServers": {
+    "devsync": {
+      "command": "node",
+      "args": ["C:\\caminho\\para\\devsync\\src\\cli.js", "mcp"]
+    }
+  }
+}
 ```
 
-Abra o endereço exibido no terminal. Ele contém um token local de acesso; não o compartilhe. Em outro terminal:
+Ferramentas disponibilizadas pelo servidor MCP:
+- `devsync_status`: Lista projetos cadastrados, branches e status de sincronização.
+- `devsync_sync`: Sincroniza um projeto específico.
+- `devsync_sync_all`: Sincroniza todos os projetos ativos em lote.
+- `devsync_diff`: Inspeciona diff e arquivos modificados com proteção a segredos.
+- `devsync_stash_sync`: Executa Stash seguro, puxa o remoto e reaplica alterações.
+- `devsync_diagnose`: Avalia integridade Git de qualquer pasta local.
+- `devsync_history`: Consulta os últimos eventos e histórico de sincronizações.
+- `devsync_pause_resume`: Pausa ou retoma automações de um projeto.
+
+## Executar pelo código e CLI
+
+Requisitos: Node.js 22+ e Git. O daemon e a CLI usam somente módulos nativos e funcionam sem instalar dependências npm.
 
 ```powershell
-node src/cli.js add "C:\Projetos\meu-crm"
-node src/cli.js clone "https://github.com/usuario/projeto.git" "C:\Projetos\nova-pasta"
+# Iniciar o serviço local em background:
+npm start
+
+# Ou executar comandos diretamente pelo terminal:
 node src/cli.js status
-node src/cli.js diagnose "C:\Projetos\meu-crm"
-node src/cli.js history ID_DO_PROJETO 100
-node src/cli.js settings ID_DO_PROJETO 30 60 "src/**,README.md"
+node src/cli.js sync-all
+node src/cli.js diff ID_DO_PROJETO
+node src/cli.js stash-sync ID_DO_PROJETO
 node src/cli.js sync ID_DO_PROJETO
-node src/cli.js push-on ID_DO_PROJETO
-node src/cli.js checkpoint-on ID_DO_PROJETO
-node src/cli.js pause ID_DO_PROJETO
-node src/cli.js resume ID_DO_PROJETO
+node src/cli.js check-remote https://seu-coordenador.com
 node src/cli.js dashboard
 ```
 
-Para executar o desktop a partir do código ou gerar o instalador:
+Para executar o desktop a partir do código ou compilar o executável:
 
 ```powershell
 npm ci
 npm run desktop
-# Gerar instalador Windows:
+# Compilar instalador e portátil Windows:
 npm run dist
 ```
 
-Em Linux/macOS, serviço e CLI usam os caminhos locais. Esta entrega empacota o desktop para Windows x64. Use o ID em comandos: nomes de projetos podem se repetir em pastas diferentes.
+## Publicar o Coordenador Remoto
 
-## Trabalho e Casa
+O coordenador conecta seus computadores de Casa e Trabalho através de um servidor seguro com HTTPS:
 
-1. Cadastre o mesmo repositório em cada PC.
-2. Ative **envio de commits** onde quiser enviar automaticamente. O padrão é desativado.
-3. Faça seus commits normalmente ou ative checkpoints em cada projeto desejado.
-4. No intervalo configurado por projeto (30 segundos por padrão), o serviço busca atualizações e aplica somente fast-forward. Se autorizado, envia os commits existentes.
-5. No outro PC, o projeto precisa estar na branch cadastrada e em condições de receber atualizações. Pendências aparecem no painel e nas notificações do desktop.
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy)
 
-## Checkpoints automáticos
+Consulte [configuração do servidor remoto](docs/REMOTE.md) e [implantação e backups](docs/DEPLOYMENT.md). É possível rodar em VPS com Docker Compose + Caddy (`compose.yaml`) ou no Render com disco persistente (`render.yaml`).
 
-Checkpoints e push são opções independentes e começam desativados. Ativar checkpoints autoriza criar commits após cerca de 60 segundos de estabilidade das diferenças observadas. A verificação usa o intervalo do projeto. O Git precisa de `user.name` e `user.email` configurados.
-
-Somente alterações e exclusões de arquivos já presentes no último commit entram no checkpoint, respeitando os padrões permitidos. Arquivos novos, inclusive os já adicionados ao índice, ficam para um commit manual. Alterações de outros arquivos no índice são preservadas. Arquivos ainda não salvos no editor não são vistos. Checkpoints não são snapshots de arquivos ignorados pelo Git.
-
-Abra **Regras de sincronização e checkpoints** no projeto: intervalo entre 15 e 3.600 segundos, espera estável entre 30 e 3.600 segundos e um padrão por linha. `src/**` inclui a pasta e suas subpastas, `*.md` inclui Markdown na raiz, `**/*.md` inclui também subpastas; `**` é o padrão inicial. Não são aceitos caminhos absolutos, `..`, regras negativas ou padrões para `.git`. Arquivos fora das regras permanecem intactos e ainda podem impedir o recebimento por fast-forward.
-
-Checkpoints pausam durante operações Git, troca de branch ou divergência já conhecida. Nomes comuns de arquivos sensíveis, como `.env`, `*.key`, `*.pem` e `credentials`, bloqueiam o commit automático. Isso não detecta todo segredo: revise o `.gitignore` e os arquivos rastreados antes de ativar. Checkpoints não enviam commits sem a opção de envio ativada. Arquivos novos pendentes também impedem a sincronização, mesmo após um checkpoint dos arquivos rastreados.
-
-## Painel remoto
-
-O coordenador está implementado como servidor separado com pareamento por token de dispositivo, status de Casa e Trabalho, fila persistente para PCs offline, resultados e revogação. As conexões partem dos PCs; nenhuma porta precisa ser aberta neles.
-
-Consulte [configuração do servidor remoto](docs/REMOTE.md). É possível testar em localhost; para uso entre computadores, hospede o coordenador com HTTPS e armazenamento persistente. O instalador não publica um servidor nem cria uma conta de hospedagem automaticamente.
-
-A versão 0.3 inclui Docker Compose com Caddy para HTTPS em VPS e um blueprint para Render com disco persistente. Veja [implantação e backups](docs/DEPLOYMENT.md). O serviço exige uma única instância por diretório de dados.
-
-O painel remoto pode sincronizar, pausar e retomar. Configuração de pastas, checkpoints, clonagem e envio são locais. Os comandos podem ser repetidos após uma perda de conexão antes da confirmação; sincronizar, pausar e retomar são idempotentes.
-
-## Dados e proteções
-
-O **Histórico** guarda os últimos 1.000 resultados e mudanças de regras em `history.json`, sobrevivendo a reinicializações. A tela mostra os últimos 100 e permite filtrar por projeto; a CLI aceita um limite até 1.000. Cada resultado registra origem, estado, motivo, commits recebidos/enviados, checkpoint e hashes antes/depois. O histórico não copia conteúdo de arquivos, caminhos locais ou tokens. Não remova o arquivo se quiser preservar os registros.
-
-- Configuração local em `~/.devsync`; `DEVSYNC_HOME` permite isolar outra instância. Contém caminhos de projetos e token do dispositivo, quando conectado. Proteja essa pasta.
-- Serviço local ligado somente a `127.0.0.1`, com token aleatório e validação de Host/Origin. Não exponha essa API na rede.
-- Recebimento por fast-forward, sem reset, stash, rebase, merge de históricos divergentes ou push forçado.
-- Lock por repositório e fila local evitam operações simultâneas do DevSync. Ferramentas Git externas não respeitam esse lock; evite operações manuais durante sincronizações.
-- Falhas de rede são tentadas novamente no próximo ciclo. Timeout de 60 segundos por operação Git.
-- Use repositórios/configurações Git confiáveis: Git usa seus transportes, helpers e hooks locais.
-- Encerramento abrupto pode deixar locks. O serviço recupera automaticamente `~/.devsync/daemon.lock` quando o PID registrado comprovadamente encerrou. Bloqueios recentes, processos ativos e origem incerta são preservados. Locks Git não são removidos automaticamente; confirme que nenhuma sincronização está ativa antes de removê-los.
-- Não há resolutor automático de conflitos. Resolva divergências no editor/Git e solicite nova sincronização.
-
-## Atualizações do desktop
-
-Na tela **Computador**, configure uma pasta HTTPS confiável de atualizações e ative a verificação optativa. O aplicativo consulta ao iniciar e a cada seis horas. Ele solicita aprovação da nova fonte, oferece **Baixar atualização** e exige **Instalar e reiniciar**; a sincronização encerra antes de instalar. Downloads verificam o checksum e ficam restritos à mesma origem e pasta da fonte aprovada, incluindo redirecionamentos.
-
-A geração do instalador produz `latest.yml`, `DevSync Setup 0.3.0.exe` e seu `.blockmap` em `dist`. Publique os três juntos na pasta HTTPS indicada. A fonte `.invalid` no empacotamento é apenas um placeholder; configure o endereço publicado na tela. A versão 0.2 precisa de instalação manual da 0.3 uma vez. Nenhum servidor de versões foi publicado automaticamente.
-
-## Verificação
+## Verificação e Testes
 
 ```powershell
 npm test
 ```
 
-Testes usam remotos e clones temporários, sem acessar seus projetos ou GitHub. Cobrem sincronização, push optativo, preservação de alterações, divergência, locks, branches, checkpoints, cadastro e clonagem pela API, autenticação, pareamento, persistência da fila, execução remota e revogação.
+A suíte conta com **42 testes automatizados** cobrindo sincronização Git, fast-forward, preservação de alterações, detecção de divergência, locks anti-duplicação, checkpoints optativos, servidor MCP, Stash seguro, diffs, persistência SQLite e segurança contra ReDoS.
 
-Consulte [decisões iniciais](docs/ADR-001.md), [decisões da versão 0.3](docs/ADR-002.md) e [validação da entrega](docs/VALIDATION.md). O coordenador JSON é destinado ao uso pessoal, com uma instância por diretório. Escala maior e múltiplos usuários exigem outra camada de persistência e autenticação.
+Consulte [decisões iniciais](docs/ADR-001.md), [decisões da versão 0.3](docs/ADR-002.md) e [validação da entrega](docs/VALIDATION.md).

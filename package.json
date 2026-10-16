@@ -1,7 +1,8 @@
 {
   "name": "devsync-local",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "private": true,
+  "license": "MIT",
   "type": "module",
   "engines": {
     "node": ">=22"
@@ -11,15 +12,18 @@
   },
   "main": "desktop/main.cjs",
   "description": "Sincronização Git entre computadores",
-  "author": "DevSync",
+  "author": "Henrique Bezerra Dos Santos",
   "scripts": {
     "start": "node src/cli.js daemon",
     "test": "node --test",
     "devsync": "node src/cli.js",
+    "mcp": "node src/cli.js mcp",
     "desktop": "electron .",
     "coordinator": "node src/cli.js coordinator",
     "token": "node -e \"console.log(require('node:crypto').randomBytes(32).toString('hex'))\"",
     "dist": "electron-builder --win nsis portable --publish never",
+    "dist:linux": "electron-builder --linux AppImage deb --publish never",
+    "dist:mac": "electron-builder --mac dmg zip --publish never",
     "pack": "electron-builder --dir --publish never"
   },
   "build": {
@@ -32,9 +36,26 @@
       "package.json"
     ],
     "win": {
+      "icon": "desktop/icon.ico",
       "target": [
         "nsis",
         "portable"
+      ]
+    },
+    "linux": {
+      "icon": "desktop/icon.png",
+      "category": "Development",
+      "target": [
+        "AppImage",
+        "deb"
+      ]
+    },
+    "mac": {
+      "icon": "desktop/icon.png",
+      "category": "public.app-category.developer-tools",
+      "target": [
+        "dmg",
+        "zip"
       ]
     },
     "nsis": {

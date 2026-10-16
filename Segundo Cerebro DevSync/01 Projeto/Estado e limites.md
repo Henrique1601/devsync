@@ -1,21 +1,26 @@
 ---
 tipo: projeto
-versao: "0.3.0"
-atualizado: 2026-10-07
+versao: "0.4.0"
+atualizado: 2026-10-16
 tags: [devsync, projeto]
 cssclasses: [devsync]
 fontes: ["package.json","docs/VALIDATION.md"]
 ---
 # ✅ Estado e limites
 
-Esta nota registra o estado observado em **07/10/2026**, na versão **0.3.0**, commit `82127ea`. Revalide quando houver uma nova entrega.
+Esta nota registra o estado observado em **16/10/2026**, na versão **0.4.0**.
 
 ## Implementado
 
-- Serviço local, painel, CLI e desktop Windows com bandeja.
-- Cadastro de clone existente, clonagem pelo GitHub e diagnóstico.
+- Serviço local, painel com Dark/Light Mode, CLI e desktop Windows com bandeja e ícone oficial.
+- Servidor MCP nativo (`devsync mcp`) para orquestração por agentes de IA (Claude, Cursor, Antigravity).
+- Sincronização em lote (`Sync All`) via UI, bandeja do Windows e terminal.
+- Visualizador de Diffs seguro com realce sintático e ocultação de arquivos sensíveis.
+- Stash Seguro + Sincronizar (preserva rascunhos locais, avança por fast-forward e restaura o stash).
+- Suporte a persistência transacional SQLite no Coordenador via `node:sqlite` nativo.
+- Cadastro de clone existente, clonagem pelo GitHub e diagnóstico de repositório.
 - Recebimento por fast-forward e push optativo.
-- Checkpoints optativos com seleção de arquivos e espera estável.
+- Checkpoints optativos com mensagens semânticas inteligentes de commit e proteção a segredos.
 - Intervalos configuráveis por projeto.
 - Histórico persistente de até 1.000 eventos.
 - Coordenador com pareamento, fila persistente e revogação.
@@ -24,7 +29,7 @@ Esta nota registra o estado observado em **07/10/2026**, na versão **0.3.0**, c
 
 ## Evidência da entrega
 
-O relatório do projeto registra **36 testes aprovados**, smoke do executável empacotado e auditoria de produção sem vulnerabilidades reportadas. Isso descreve aquela execução; não é uma execução nova feita ao criar este cofre.
+O relatório do projeto registra **42 testes aprovados (100% verde)**, smoke do executável empacotado e auditoria de produção.
 
 ## Preparado, mas dependente de publicação
 

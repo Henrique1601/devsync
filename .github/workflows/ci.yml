@@ -40,6 +40,7 @@ jobs:
           node --check src/onboarding.js
           node --check src/checkpoint.js
           node --check src/service-lock.js
+          node --check src/mcp.js
 
       - name: Run automated test suite
         run: npm test

@@ -17,6 +17,8 @@ if (smoke) {
 }
 const startupArgs = app.isPackaged ? ['--background'] : [app.getAppPath(), '--background'];
 function icon() {
+  const fileIcon = nativeImage.createFromPath(path.join(__dirname, 'icon.png'));
+  if (!fileIcon.isEmpty()) return fileIcon;
   const crc = bytes => { let n = -1; for (const b of bytes) { n ^= b; for (let i=0;i<8;i++) n=(n>>>1)^((n&1)?0xedb88320:0); } return (n^-1)>>>0; };
   const chunk = (kind, bytes) => { const name=Buffer.from(kind), size=Buffer.alloc(4), check=Buffer.alloc(4); size.writeUInt32BE(bytes.length);check.writeUInt32BE(crc(Buffer.concat([name,bytes])));return Buffer.concat([size,name,bytes,check]); };
   const header=Buffer.alloc(13);header.writeUInt32BE(32,0);header.writeUInt32BE(32,4);header[8]=8;header[9]=6;
@@ -78,7 +80,10 @@ else {
         updateTimer = setInterval(() => updates.check(), 6 * 60 * 60 * 1000);
       }
       tray = new Tray(icon());tray.setToolTip('DevSync — sincronização de projetos');
-      tray.setContextMenu(Menu.buildFromTemplate([{label:'Abrir DevSync',click:show},{label:'Sair',click:()=>app.quit()}]));tray.on('double-click',show);
+      const syncAllFromTray = async () => {
+        try { await fetch(`http://127.0.0.1:${runtime.port}/api/command`, { method: 'POST', headers: { authorization: `Bearer ${runtime.token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ command: 'sync-all' }) }); } catch {}
+      };
+      tray.setContextMenu(Menu.buildFromTemplate([{label:'Abrir DevSync',click:show},{label:'Sincronizar todos',click:syncAllFromTray},{type:'separator'},{label:'Sair',click:()=>app.quit()}]));tray.on('double-click',show);
       const last = new Map(); let checking=false;
       pollTimer=setInterval(async()=>{if(checking)return;checking=true;try{const r=await fetch(`http://127.0.0.1:${runtime.port}/api/status`,{headers:{authorization:`Bearer ${runtime.token}`},signal:AbortSignal.timeout(5000)});if(!r.ok)return;const {projects}=await r.json();for(const p of projects){const previous=last.get(p.id);last.set(p.id,p.state);if(previous&&previous!==p.state&&['error','dirty','diverged','synced'].includes(p.state)&&Notification.isSupported())new Notification({title:'DevSync: '+p.name,body:p.state==='synced'?'Projeto sincronizado.':'O projeto precisa de atenção. Abra o DevSync para ver os detalhes.'}).show()}}catch{}finally{checking=false}},10000);
       if (!process.argv.includes('--background')) await show();

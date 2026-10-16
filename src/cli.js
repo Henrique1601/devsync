@@ -10,20 +10,29 @@ try {
     console.log(`Coordenador: porta ${coordinator.server.address().port}`);
     const stop = async () => { await coordinator.close(); process.exit(0); };process.on('SIGINT',stop);process.on('SIGTERM',stop);
   }
-  else if (command === 'help') console.log(`DevSync 0.3 — Node.js 22+ e Git
+  else if (command === 'mcp') {
+    const { startMcpServer } = await import('./mcp.js');
+    await startMcpServer();
+  }
+  else if (command === 'help') console.log(`DevSync 0.4 — Node.js 22+ e Git
 
   devsync daemon                         Inicia serviço local
+  devsync mcp                            Inicia servidor MCP (Model Context Protocol) via stdio
   devsync add <pasta>                     Cadastra clone com upstream
   devsync clone <url-github> <nova-pasta>  Clona e cadastra um projeto
   devsync status                         Exibe projetos e conexão remota
   devsync history [id] [limite]           Exibe histórico persistente
   devsync diagnose <pasta>               Verifica Git e configuração
+  devsync diff <id>                      Exibe arquivos alterados e diff seguro
   devsync settings <id> <intervalo> <espera> <padrões separados por vírgula>
-  devsync sync <id>                       Sincroniza agora
+  devsync sync <id>                       Sincroniza projeto agora (ou --all para todos)
+  devsync sync-all                       Sincroniza todos os projetos ativos em lote
+  devsync stash-sync <id> [--no-pop]      Guarda alterações em Stash seguro e sincroniza
   devsync pause <id> / resume <id>        Pausa ou retoma automação
   devsync push-on <id> / push-off <id>    Controla envio automático
   devsync checkpoint-on <id>              Autoriza commits automáticos
   devsync checkpoint-off <id>             Desativa commits automáticos
+  devsync check-remote <url>              Testa conectividade com coordenador remoto
   devsync remote-config <url> <token> <device-id> <nome>
   devsync remote-off                     Desconecta painel remoto
   devsync dashboard                      Exibe endereço do painel
@@ -37,9 +46,15 @@ Checkpoints e envio são optativos e começam desativados.`);
     const url = `http://127.0.0.1:${runtime.port}`;
     if (command === 'dashboard') console.log(`${url}/#${runtime.token}`);
     else {
-      const readonly = ['status', 'history'].includes(command);
-      const route = command === 'history' ? 'history?' + new URLSearchParams({ ...(argument ? { projectId: argument } : {}), ...(extra ? { limit: extra } : {}) }) : command === 'status' ? 'status' : 'command';
-      const payload = command === 'clone' ? { command, url: argument, path: extra } : command === 'remote-config' ? { command, settings: { url: argument, token: extra, deviceId, name } } : command === 'settings' ? { command, id: argument, ...(extra === undefined ? {} : { syncIntervalSeconds: Number(extra) }), ...(deviceId === undefined ? {} : { checkpointDelaySeconds: Number(deviceId) }), ...(name === undefined ? {} : { checkpointInclude: name.split(',').map(value => value.trim()) }) } : { command, path: argument, id: argument };
+      const normalized = command === 'sync' && argument === '--all' ? 'sync-all' : command;
+      const readonly = ['status', 'history'].includes(normalized);
+      const route = normalized === 'history' ? 'history?' + new URLSearchParams({ ...(argument ? { projectId: argument } : {}), ...(extra ? { limit: extra } : {}) }) : normalized === 'status' ? 'status' : 'command';
+      const payload = normalized === 'clone' ? { command: normalized, url: argument, path: extra }
+        : normalized === 'remote-config' ? { command: normalized, settings: { url: argument, token: extra, deviceId, name } }
+        : normalized === 'check-remote' ? { command: normalized, url: argument }
+        : normalized === 'stash-sync' ? { command: normalized, id: argument, pop: extra !== '--no-pop' }
+        : normalized === 'settings' ? { command: normalized, id: argument, ...(extra === undefined ? {} : { syncIntervalSeconds: Number(extra) }), ...(deviceId === undefined ? {} : { checkpointDelaySeconds: Number(deviceId) }), ...(name === undefined ? {} : { checkpointInclude: name.split(',').map(value => value.trim()) }) }
+        : { command: normalized, path: argument, id: argument };
       const response = await fetch(`${url}/api/${route}`, {
         method: readonly ? 'GET' : 'POST', signal: AbortSignal.timeout(180000),
         headers: { authorization: `Bearer ${runtime.token}`, 'Content-Type': 'application/json' },

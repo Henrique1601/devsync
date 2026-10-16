@@ -4,7 +4,7 @@ import { mkdir, rm, realpath, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { home, read, write } from './store.js';
-import { git, inspect, synchronize } from './git.js';
+import { git, inspect, inspectDiff, stashAndSync, synchronize } from './git.js';
 import { startRemote, validateRemote } from './remote-client.js';
 import { acquireServiceLock } from './service-lock.js';
 import { rulesFor, validateRules, isSyncDue } from './rules.js';
@@ -63,6 +63,28 @@ export async function daemon() {
     async function perform(data, source = 'manual') {
       if (!data || typeof data !== 'object' || Array.isArray(data)) throw new CommandError('Parâmetros do comando inválidos.');
       if (data.command === 'diagnose') return diagnose(data.path);
+      if (data.command === 'check-remote') {
+        if (typeof data.url !== 'string' || !data.url.trim()) throw new CommandError('Informe a URL do coordenador remoto.');
+        let parsed;
+        try { parsed = new URL(data.url.trim()); } catch { throw new CommandError('URL do coordenador inválida.'); }
+        const local = ['127.0.0.1', 'localhost', '::1', '[::1]'].includes(parsed.hostname);
+        if (parsed.protocol !== 'https:' && !(local && parsed.protocol === 'http:')) throw new CommandError('O coordenador remoto exige HTTPS fora de localhost.');
+        const base = parsed.origin;
+        const start = Date.now();
+        try {
+          const r = await fetch(`${base}/api/health`, { signal: AbortSignal.timeout(5000) });
+          const body = await r.json().catch(() => ({}));
+          if (!r.ok || !body.ok) throw new Error();
+          return { ok: true, url: base, latencyMs: Date.now() - start };
+        } catch {
+          throw new CommandError('Não foi possível conectar ao coordenador em ' + base + '. Verifique o endereço e se o servidor está ativo.');
+        }
+      }
+      if (data.command === 'sync-all') {
+        const active = config.projects.filter(p => !p.paused && !busy.has(p.id));
+        await settleOperations(active.map(repo => sync(repo, source)));
+        return { synced: active.length, projects: projectStatus() };
+      }
       if (data.command === 'remote-config') {
         let settings;
         try { settings = validateRemote(data.settings); } catch (error) { throw new CommandError(error.message); }
@@ -80,7 +102,7 @@ export async function daemon() {
         catch { throw new CommandError('Não foi possível clonar. Confira o repositório, rede e autenticação do Git. O clone parcial, se existir, foi preservado.'); }
         return perform({ command: 'add', path: destination }, source);
       }
-      if (!['add', 'sync', 'pause', 'resume', 'push-on', 'push-off', 'checkpoint-on', 'checkpoint-off', 'settings'].includes(data.command)) throw new CommandError('Comando desconhecido.');
+      if (!['add', 'sync', 'diff', 'stash-sync', 'pause', 'resume', 'push-on', 'push-off', 'checkpoint-on', 'checkpoint-off', 'settings'].includes(data.command)) throw new CommandError('Comando desconhecido.');
       if (data.command === 'add') {
         if (typeof data.path !== 'string' || !data.path.trim()) throw new CommandError('Informe o caminho da pasta do projeto.');
         const folder = data.path.trim().replace(/^"(.*)"$/, '$1');
@@ -104,6 +126,28 @@ export async function daemon() {
       }
       const repo = config.projects.find(p => p.id === data.id || p.name === data.id);
       if (!repo) throw new CommandError('Projeto não encontrado. Use o ID exibido em status.');
+      if (data.command === 'diff') {
+        try { return await inspectDiff(repo); }
+        catch (error) { throw new CommandError(error.message || 'Não foi possível inspecionar as alterações do projeto.'); }
+      }
+      if (data.command === 'stash-sync') {
+        if (busy.has(repo.id)) throw new CommandError('Projeto já está sincronizando. Aguarde a operação terminar.');
+        return withBusy(busy, repo.id, async () => {
+          const startedAt = new Date().toISOString();
+          const before = await snapshot(repo);
+          try {
+            const result = await stashAndSync(repo, { pop: data.pop !== false });
+            states.set(repo.id, { ...result, reason: result.message || stateReasons[result.state], checkedAt: new Date().toISOString() });
+          } catch (error) {
+            throw new CommandError(error.message || 'Falha ao executar Stash seguro e sincronização.');
+          }
+          lastRuns.set(repo.id, Date.now());
+          const result = states.get(repo.id);
+          await history.append({ projectId: repo.id, projectName: repo.name, source, action: 'stash-sync', startedAt, finishedAt: result.checkedAt,
+            ...result, reason: result.message || stateReasons[result.state], before, after: { ...await snapshot(repo), state: result.state } });
+          return result;
+        });
+      }
       if (data.command === 'sync') {
         if (busy.has(repo.id)) throw new CommandError('Projeto já está sincronizando. Aguarde a operação terminar.');
         await sync(repo, source); return states.get(repo.id);

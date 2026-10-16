@@ -2,7 +2,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { access, mkdir, rm } from 'node:fs/promises';
 import path from 'node:path';
-import { checkpoint } from './checkpoint.js';
+import { checkpoint, SENSITIVE_FILE_PATTERN } from './checkpoint.js';
 const exec = promisify(execFile);
 export async function git(cwd, ...args) {
   return (await gitRaw(cwd, ...args)).trim();
@@ -28,6 +28,69 @@ export async function inspect(repo) {
   }
   return { branch, dirty, upstream, ahead, behind, operation,
     state: operation ? 'operation' : branch !== repo.branch ? 'branch-changed' : dirty ? 'dirty' : ahead && behind ? 'diverged' : ahead ? 'ahead' : behind ? 'behind' : 'synced' };
+}
+export async function inspectDiff(repo) {
+  const status = await inspect(repo);
+  const porcelain = await gitRaw(repo.path, 'status', '--porcelain', '-uall');
+  const files = [];
+  for (const line of porcelain.split(/\r?\n/).filter(Boolean)) {
+    const code = line.slice(0, 2).trim() || '?';
+    const rawPath = line.slice(3).trim().replace(/^"(.*)"$/, '$1');
+    const filePath = rawPath.includes(' -> ') ? rawPath.split(' -> ').pop() : rawPath;
+    const sensitive = SENSITIVE_FILE_PATTERN.test(filePath);
+    files.push({ status: code, path: filePath, sensitive });
+  }
+  const safeFiles = files.filter(f => !f.sensitive && f.status !== '??').map(f => f.path);
+  const stat = safeFiles.length ? await git(repo.path, '--literal-pathspecs', 'diff', '--stat', 'HEAD', '--', ...safeFiles).catch(() => '') : '';
+  const rawDiff = safeFiles.length ? await gitRaw(repo.path, '--literal-pathspecs', 'diff', 'HEAD', '--', ...safeFiles).catch(() => '') : '';
+  const commits = (status.ahead || status.behind)
+    ? (await git(repo.path, 'log', '--left-right', '--oneline', '-n', '15', 'HEAD...@{u}').catch(() => '')).split(/\r?\n/).filter(Boolean)
+    : [];
+  return {
+    ...status,
+    files,
+    stat,
+    diff: rawDiff.length > 32768 ? rawDiff.slice(0, 32768) + '\n... [diff truncado em 32 KB]' : rawDiff,
+    commits
+  };
+}
+export async function stashAndSync(repo, { pop = true } = {}) {
+  const status = await inspect(repo);
+  if (['branch-changed', 'detached', 'operation'].includes(status.state)) {
+    throw new Error('Não é possível usar Stash seguro durante operação Git ativa, HEAD destacado ou branch diferente da cadastrada.');
+  }
+  let stashCreated = false;
+  if (status.dirty) {
+    const hasSensitive = (await inspectDiff(repo)).files.some(f => f.sensitive);
+    if (hasSensitive) throw new Error('Stash bloqueado: há arquivos sensíveis modificados (.env, chaves ou credenciais). Trate-os manualmente.');
+    const label = `DevSync safe stash ${new Date().toISOString()}`;
+    await git(repo.path, 'stash', 'push', '--include-untracked', '-m', label);
+    stashCreated = true;
+  }
+  const result = await synchronize({ ...repo, paused: false });
+  let stashPopped = false;
+  let stashConflict = false;
+  if (stashCreated && pop && ['synced', 'ahead'].includes(result.state)) {
+    try {
+      await git(repo.path, 'stash', 'pop');
+      stashPopped = true;
+    } catch {
+      stashConflict = true;
+    }
+  }
+  const finalStatus = await inspect(repo);
+  return {
+    ...result,
+    ...finalStatus,
+    stashCreated,
+    stashPopped,
+    stashConflict,
+    message: stashConflict
+      ? 'Sincronização concluída, mas reaplicar o Stash gerou conflito. Suas alterações continuam salvas no git stash.'
+      : stashCreated && !stashPopped
+        ? 'Alterações guardadas no git stash. Resolva o estado do repositório antes de reaplicá-las.'
+        : undefined
+  };
 }
 export async function synchronize(repo) {
   const activity = { receivedCommits: 0, sentCommits: 0, checkpointCreated: false };

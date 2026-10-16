@@ -8,13 +8,30 @@ function matches(actual, expected) {
   const a = Buffer.from(actual || ''), b = Buffer.from(expected || '');
   return a.length === b.length && timingSafeEqual(a, b);
 }
-export async function createCoordinator({ directory, adminToken, host = '127.0.0.1', port = 8787 }) {
+export async function createCoordinator({ directory, adminToken, host = '127.0.0.1', port = 8787, storage = process.env.DEVSYNC_COORDINATOR_STORAGE || 'json' }) {
   if (!adminToken || adminToken.length < 32) throw new Error('DEVSYNC_ADMIN_TOKEN precisa de pelo menos 32 caracteres.');
+  if (!['json', 'sqlite'].includes(storage)) throw new Error('DEVSYNC_COORDINATOR_STORAGE deve ser json ou sqlite.');
   await mkdir(directory, { recursive: true, mode: 0o700 });
   const filename = path.join(directory, 'coordinator.json');
-  let data;
-  try { data = JSON.parse(await readFile(filename, 'utf8')); }
-  catch (error) { if (error.code !== 'ENOENT') throw error; data = { devices: [], jobs: [] }; }
+  let data = { devices: [], jobs: [] };
+  let sqliteDb = null;
+  if (storage === 'sqlite') {
+    const { DatabaseSync } = await import('node:sqlite');
+    sqliteDb = new DatabaseSync(path.join(directory, 'coordinator.sqlite'));
+    sqliteDb.exec(`
+      PRAGMA journal_mode = WAL;
+      CREATE TABLE IF NOT EXISTS coordinator_state (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        payload TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+    `);
+    const row = sqliteDb.prepare('SELECT payload FROM coordinator_state WHERE id = 1').get();
+    if (row?.payload) data = JSON.parse(row.payload);
+  } else {
+    try { data = JSON.parse(await readFile(filename, 'utf8')); }
+    catch (error) { if (error.code !== 'ENOENT') throw error; data = { devices: [], jobs: [] }; }
+  }
   const page = await readFile(new URL('../ui/remote.html', import.meta.url));
   let writes = Promise.resolve();
   async function save() {
@@ -22,7 +39,15 @@ export async function createCoordinator({ directory, adminToken, host = '127.0.0
     const complete = data.jobs.filter(j => j.status === 'completed').slice(-200);
     data.jobs = [...data.jobs.filter(j => j.status !== 'completed'), ...complete];
     const snapshot = JSON.stringify(data, null, 2);
-    const pending = writes.then(async () => { await writeFile(filename + '.tmp', snapshot, { mode: 0o600 }); await rename(filename + '.tmp', filename); });
+    const pending = writes.then(async () => {
+      if (sqliteDb) {
+        sqliteDb.prepare('INSERT INTO coordinator_state (id, payload, updated_at) VALUES (1, ?, ?) ON CONFLICT(id) DO UPDATE SET payload = excluded.payload, updated_at = excluded.updated_at')
+          .run(snapshot, new Date().toISOString());
+      } else {
+        await writeFile(filename + '.tmp', snapshot, { mode: 0o600 });
+        await rename(filename + '.tmp', filename);
+      }
+    });
     writes = pending.catch(() => {}); await pending;
   }
   let requests = Promise.resolve();
@@ -104,5 +129,5 @@ export async function createCoordinator({ directory, adminToken, host = '127.0.0
   server.requestTimeout = 20000;
   server.headersTimeout = 15000;
   await new Promise((resolve, reject) => { server.once('error', reject); server.listen(port, host, resolve); });
-  return { server, close: async () => { await new Promise(resolve => server.close(resolve)); await writes; } };
+  return { server, storage, close: async () => { await new Promise(resolve => server.close(resolve)); await writes; sqliteDb?.close(); } };
 }
