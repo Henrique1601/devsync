@@ -172,6 +172,18 @@ export const MCP_TOOLS = [
       properties: {},
       additionalProperties: false
     }
+  },
+  {
+    name: 'devsync_catch_up',
+    description: 'Gera um briefing executivo matinal e plano de retomada de contexto com IA/heurística para um projeto após sincronização.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        id: { type: 'string', description: 'ID ou nome do projeto cadastrado (opcional; padrão: primeiro ativo).' },
+        date: { type: 'string', description: 'Data YYYY-MM-DD para salvar no diário do Obsidian (opcional).' }
+      },
+      additionalProperties: false
+    }
   }
 ];
 
@@ -239,6 +251,8 @@ export async function executeMcpTool(name, args = {}, { callDaemon = defaultDaem
       return callDaemon('command', { command: 'daily-summary', date: args.date ? String(args.date) : undefined });
     case 'devsync_p2p_peers':
       return callDaemon('command', { command: 'p2p-peers' });
+    case 'devsync_catch_up':
+      return callDaemon('command', { command: 'catch-up', id: args.id ? String(args.id) : undefined, date: args.date ? String(args.date) : undefined });
     default:
       throw new Error(`Ferramenta MCP desconhecida: ${name}`);
   }
@@ -257,7 +271,7 @@ export async function handleMcpMessage(message, deps = {}) {
         result: {
           protocolVersion: message.params?.protocolVersion || '2024-11-05',
           capabilities: { tools: {} },
-          serverInfo: { name: 'devsync-mcp', version: '0.7.0' }
+          serverInfo: { name: 'devsync-mcp', version: '0.8.0' }
         }
       };
     }

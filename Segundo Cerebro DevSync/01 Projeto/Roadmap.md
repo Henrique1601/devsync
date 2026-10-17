@@ -1,7 +1,7 @@
 ---
 tipo: planejamento
-versao: "0.7.0"
-atualizado: 2026-10-16
+versao: "0.8.0"
+atualizado: 2026-10-17
 tags: [devsync, planejamento]
 cssclasses: [devsync]
 fontes: ["docs/VALIDATION.md","docs/DEPLOYMENT.md"]
@@ -9,6 +9,12 @@ fontes: ["docs/VALIDATION.md","docs/DEPLOYMENT.md"]
 # 🛤️ Roadmap
 
 Use esta nota para acompanhar o ciclo de entregas e os próximos passos do DevSync.
+
+## Concluído na Versão 0.8.0 (Next-Gen AI Catch-Up & Spotlight HUD)
+
+- [x] **AI Morning Catch-Up & Context Resume:** Briefing matinal inteligente analisando commits recebidos/enviados, detecção de pendências (`TODO`, `FIXME`, `HACK`), geração de próximos passos e registro automático no diário do Obsidian (`05 Registros/YYYY-MM-DD - Resumo Diario.md`). Fallback determinístico sem necessidade de API externa.
+- [x] **HUD Spotlight Command Palette & Instant Switcher:** Expansão dinâmica da pílula HUD para menu de comando estilo Spotlight/Raycast (460x420 px), busca fuzzy de repositórios, atalhos rápidos (`Enter` sincroniza, `Alt+C` abre no VS Code, `Alt+G` abre no GitHub, `Alt+D` abre diff, `Esc` recolhe) e visualizador integrado do Catch-Up Matinal.
+- [x] **Expansão do Servidor MCP para 17 Ferramentas:** Ferramenta corporativa `devsync_catch_up` adicionada para consumo por agentes autônomos.
 
 ## Concluído na Versão 0.7.0 (Next-Gen Innovation Release)
 

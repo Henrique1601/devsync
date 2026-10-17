@@ -263,6 +263,45 @@ async function refreshUpdates(){if(!window.devsyncDesktop?.updateState||updateLo
 if(window.devsyncDesktop){$('#browse').hidden=false;$('#desktop-settings').hidden=false;$('#browse').addEventListener('click',async()=>{try{const p=await window.devsyncDesktop.chooseFolder();if(p){$('#folder').value=p;$('#diagnostics').replaceChildren()}}catch(e){notice(e.message)}});window.devsyncDesktop.startupEnabled().then(v=>$('#startup').checked=v).catch(e=>notice(e.message));$('#startup').addEventListener('change',async e=>{try{e.target.checked=await window.devsyncDesktop.setStartup(e.target.checked)}catch(error){e.target.checked=!e.target.checked;notice(error.message)}});
   $('#updates').addEventListener('submit',async e=>{e.preventDefault();const button=e.currentTarget.querySelector('button');button.disabled=true;try{const requested={enabled:$('#update-enabled').checked,feedUrl:$('#update-feed').value.trim()};const saved=await window.devsyncDesktop.configureUpdates(requested);$('#update-enabled').checked=saved.enabled;$('#update-feed').value=saved.feedUrl||'';notice(saved.enabled===requested.enabled&&(!requested.feedUrl||saved.feedUrl===new URL(requested.feedUrl.endsWith('/')?requested.feedUrl:requested.feedUrl+'/').href)?'Preferência de atualização salva.':'Fonte não alterada.');await refreshUpdates()}catch(error){notice(error.message)}finally{button.disabled=false}});for(const[selector,action]of [['#update-check','checkUpdates'],['#update-download','downloadUpdate'],['#update-install','installUpdate']])$(selector).addEventListener('click',async()=>{const button=$(selector);button.disabled=true;try{await window.devsyncDesktop[action]();await refreshUpdates()}catch(e){notice(e.message)}finally{button.disabled=false}});refreshUpdates();setInterval(()=>{if(view==='settings')refreshUpdates()},1500);
 }
+async function openCatchUp(projectId){
+  const modal=$('#catchup-modal'),body=$('#catchup-body');
+  if(!modal||!body)return;
+  body.replaceChildren(el('p','Analisando sessão anterior e gerando resumo matinal com IA…'));
+  if(typeof modal.showModal==='function')modal.showModal();else modal.removeAttribute('hidden');
+  try{
+    const res=await api('command',{command:'catch-up',id:projectId||undefined});
+    const b=res.briefing;
+    body.replaceChildren();
+    const card=el('div',undefined,'catchup-card');
+    const header=el('div',undefined,'project-top');
+    header.append(el('h3',`🌅 ${b.projectName}`),el('span',b.method==='gemini-ai'?'Gemini AI':'Heurística Semântica','badge'));
+    card.append(header);
+    const summaryBox=el('div',undefined,'conflict-ok');
+    summaryBox.append(el('strong','Resumo da Sessão: '),el('span',b.summary));
+    card.append(summaryBox);
+    if(b.highlights?.length){
+      card.append(el('h4','Principais Alterações Sincronizadas:'));
+      const list=el('div',undefined,'file-list');
+      for(const h of b.highlights)list.append(el('div','• '+h,'file-chip'));
+      card.append(list);
+    }
+    if(b.todos?.length){
+      card.append(el('h4','Pontos de Atenção & TODOs:'));
+      const todoList=el('div',undefined,'file-list');
+      for(const t of b.todos)todoList.append(el('div','⚠️ '+t,'file-chip file-sensitive'));
+      card.append(todoList);
+    }
+    const nextBox=el('div',undefined,'secret-safe');
+    nextBox.append(el('strong','Próximo Passo Recomendado: '),el('p',b.nextStep));
+    card.append(nextBox);
+    body.append(card);
+    notice('Catch-Up matinal gerado e registrado no Obsidian!');
+  }catch(err){
+    body.replaceChildren(el('p','Erro no catch-up: '+err.message,'hint'));
+  }
+}
+$('#history-catchup')?.addEventListener('click',()=>openCatchUp($('#history-project').value||undefined));
+$('#catchup-close')?.addEventListener('click',()=>{const m=$('#catchup-modal');if(typeof m?.close==='function')m.close();else m?.setAttribute('hidden','')});
 $('#history-daily')?.addEventListener('click',async()=>{
   const b=$('#history-daily');b.disabled=true;notice('Gerando diário no Obsidian…');
   try{

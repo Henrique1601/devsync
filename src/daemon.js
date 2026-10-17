@@ -4,11 +4,11 @@ import { mkdir, rm, realpath, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { home, read, write } from './store.js';
-import { git, inspect, inspectDiff, predictConflicts, stashAndSync, synchronize } from './git.js';
+import { git, gitRaw, inspect, inspectDiff, predictConflicts, stashAndSync, synchronize } from './git.js';
 import { validateWebhookSettings, sendWebhook } from './webhooks.js';
 import { calculateMetrics } from './metrics.js';
 import { scanDiff } from './secrets.js';
-import { resolveConflictAI } from './ai.js';
+import { resolveConflictAI, generateCatchUpSummary } from './ai.js';
 import { scoutRepositories } from './scout.js';
 import { syncBranchWorktree } from './worktree.js';
 import { P2PManager } from './p2p.js';
@@ -164,6 +164,33 @@ export async function daemon() {
         const date = data.date || new Date().toISOString().slice(0, 10);
         const res = await history.dailySummary({ date });
         return { ok: true, summary: res };
+      }
+      if (data.command === 'catch-up') {
+        let repo = config.projects.find(p => p.id === data.id || p.name === data.id);
+        if (!repo && config.projects.length > 0) {
+          repo = config.projects[0];
+        }
+        if (!repo) throw new CommandError('Nenhum projeto cadastrado para gerar o resumo matinal.');
+
+        let commits = [];
+        let diffText = '';
+        try {
+          const rawLog = await gitRaw(repo.path, 'log', '-n', '5', '--pretty=format:%h %s');
+          commits = rawLog.split(/\r?\n/).filter(Boolean);
+        } catch {}
+        try {
+          diffText = await gitRaw(repo.path, 'diff', 'HEAD~1..HEAD');
+        } catch {
+          try { diffText = (await inspectDiff(repo)).diff || ''; } catch {}
+        }
+
+        const briefing = await generateCatchUpSummary({ project: repo, commits, diffText });
+        if (data.saveToObsidian !== false) {
+          try {
+            await history.catchUpSummary(briefing, { date: data.date });
+          } catch {}
+        }
+        return { ok: true, briefing };
       }
       if (data.command === 'p2p-peers') {
         return { ok: true, peers: p2p?.getPeers() || [] };

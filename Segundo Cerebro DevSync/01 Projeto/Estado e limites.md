@@ -1,14 +1,20 @@
 ---
 tipo: projeto
-versao: "0.7.0"
-atualizado: 2026-10-16
+versao: "0.8.0"
+atualizado: 2026-10-17
 tags: [devsync, projeto]
 cssclasses: [devsync]
 fontes: ["package.json","docs/VALIDATION.md"]
 ---
 # ✅ Estado e limites
 
-Esta nota registra o estado observado em **16/10/2026**, na versão **0.7.0**.
+Esta nota registra o estado observado em **17/10/2026**, na versão **0.8.0**.
+
+## Implementado na Versão 0.8.0 (Next-Gen AI Catch-Up & Spotlight HUD)
+
+- **AI Morning Catch-Up & Retomada de Contexto (`src/ai.js`, `src/daemon.js`, `src/history.js`, `src/cli.js`, `src/mcp.js`):** Briefing executivo matinal que analisa commits recentes sincronizados entre Casa e Trabalho, resume destaques em linguagem natural, detecta pendências e tags técnicas (`TODO`, `FIXME`, `HACK`) nos diffs de código, formula sugestões práticas de próximos passos e persiste a seção no Segundo Cérebro do Obsidian (`Segundo Cerebro DevSync/05 Registros/YYYY-MM-DD - Resumo Diario.md`). Possui fallback heurístico 100% determinístico caso `GEMINI_API_KEY` não esteja configurada.
+- **HUD Spotlight Command Palette & Instant Switcher (`ui/hud.html`, `desktop/main.cjs`, `desktop/preload.cjs`):** Evolução da pílula translúcida flutuante para um menu Command Palette estilo Spotlight/Raycast (expansão dinâmica para 460x420 px), com busca fuzzy instantânea entre todos os repositórios cadastrados, atalhos ultra-rápidos (`Enter` sincroniza, `Alt+C` abre no VS Code via IPC nativo, `Alt+G` abre no GitHub, `Alt+D` abre diffs, `Esc` fecha) e aba dedicada para leitura do Catch-Up Matinal em cartão executivo.
+- **Expansão do Servidor MCP para 17 Ferramentas Corporativas:** Adição da ferramenta `devsync_catch_up` ao servidor MCP nativo via stdio, permitindo que agentes autônomos solicitem o briefing matinal de contexto de qualquer projeto.
 
 ## Implementado na Versão 0.7.0
 
@@ -31,14 +37,14 @@ Esta nota registra o estado observado em **16/10/2026**, na versão **0.7.0**.
 
 ## Evidência da entrega
 
-A suíte completa de testes conta com **100% de aprovação (todos os testes verdes)**, cobrindo P2P bundles, repo scout, worktrees isoladas, resumos diários no Obsidian, MCP expandido, varredura de segredos, resolução por IA, checkpoints, webhooks e coordenação remota.
+A suíte completa de testes conta com **100% de aprovação (65 testes verdes)**, cobrindo AI Morning Catch-Up, HUD Spotlight IPC, P2P bundles, repo scout, worktrees isoladas, resumos diários no Obsidian, MCP expandido (17 ferramentas), varredura de segredos, resolução por IA, checkpoints, webhooks e coordenação remota.
 
 ## Repositório e Lançamentos
 
 | Recurso | Detalhes |
 | --- | --- |
 | Repositório GitHub Oficial | `https://github.com/Henrique1601/devsync` |
-| Releases Geradas | `v0.3.0`, `v0.4.0`, `v0.5.0`, `v0.6.0` e `v0.7.0` |
+| Releases Geradas | `v0.3.0`, `v0.4.0`, `v0.5.0`, `v0.6.0`, `v0.7.0` e `v0.8.0` |
 | Binários Compilados | Instalador NSIS (`.exe`) e Versão Portátil (`.exe`) |
 | Pipeline de CI/CD | GitHub Actions com testes e compilação automatizada |
 

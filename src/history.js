@@ -48,6 +48,9 @@ export async function createHistory({ directory = home, maxEntries = 1000 } = {}
     },
     dailySummary(options) {
       return generateDailySummary(entries, options);
+    },
+    catchUpSummary(catchUpData, options) {
+      return recordCatchUpSummary(catchUpData, options);
     }
   };
 }
@@ -111,4 +114,61 @@ ${dayEntries.slice(-15).reverse().map(e => `- **${(e.finishedAt || e.startedAt |
 
   return { date, file: targetFile, totalSyncs, receivedCommits, sentCommits, checkpoints, projectsCount: projectMap.size };
 }
+
+export async function recordCatchUpSummary(catchUpData, { date = new Date().toISOString().slice(0, 10), vaultPath = path.resolve(process.cwd(), 'Segundo Cerebro DevSync') } = {}) {
+  const targetDir = path.join(vaultPath, '05 Registros');
+  await mkdir(targetDir, { recursive: true });
+  const targetFile = path.join(targetDir, `${date} - Resumo Diario.md`);
+
+  let content = '';
+  try {
+    content = await readFile(targetFile, 'utf8');
+  } catch {
+    content = `---
+tipo: diario
+data: ${date}
+tags: [devsync, diario, produtividade]
+cssclasses: [devsync]
+---
+# 📅 Diário de Bordo DevSync — ${date}
+
+← [[00 Comece aqui]]
+`;
+  }
+
+  const pName = catchUpData.projectName || 'DevSync';
+  const sectionHeader = `## 🌅 Resumo Matinal & Retomada de Contexto (${pName})`;
+  const sectionBody = `${sectionHeader}
+> **Resumo:** ${catchUpData.summary}
+
+### 🔍 Principais Mudanças
+${(catchUpData.highlights || []).map(h => `- ${h}`).join('\n') || '- Nenhuma alteração detectada.'}
+
+### 📌 Pontos de Atenção & TODOs
+${(catchUpData.todos || []).length ? catchUpData.todos.map(t => `- ${t}`).join('\n') : '- Nenhuma pendência crítica ou TODO detectado.'}
+
+### 🚀 Próximo Passo Sugerido
+**${catchUpData.nextStep || 'Retomar o fluxo de trabalho.'}**
+*(Gerado via ${catchUpData.method === 'gemini-ai' ? 'Gemini AI' : 'Heurística Semântica'} às ${(catchUpData.timestamp || new Date().toISOString()).slice(11, 19)})*
+`;
+
+  if (content.includes(`## 🌅 Resumo Matinal & Retomada de Contexto (${pName})`)) {
+    const escaped = pName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const regex = new RegExp(`## 🌅 Resumo Matinal & Retomada de Contexto \\(${escaped}\\)[\\s\\S]*?(?=\\n## |\\n←|$)`, 'g');
+    content = content.replace(regex, sectionBody + '\n');
+  } else {
+    const titleHeader = `# 📅 Diário de Bordo DevSync — ${date}`;
+    const titleMatch = content.indexOf(titleHeader);
+    if (titleMatch !== -1) {
+      const insertPos = titleMatch + titleHeader.length;
+      content = content.slice(0, insertPos) + '\n\n' + sectionBody + '\n' + content.slice(insertPos);
+    } else {
+      content = sectionBody + '\n\n' + content;
+    }
+  }
+
+  await writeFile(targetFile, content, 'utf8');
+  return { file: targetFile, date, projectName: pName };
+}
+
 

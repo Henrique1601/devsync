@@ -10,5 +10,8 @@ contextBridge.exposeInMainWorld('devsyncDesktop', {
   installUpdate: () => ipcRenderer.invoke('updates-install'),
   showMain: () => ipcRenderer.invoke('show-main'),
   closeHud: () => ipcRenderer.invoke('close-hud'),
-  toggleHud: () => ipcRenderer.invoke('toggle-hud')
+  toggleHud: () => ipcRenderer.invoke('toggle-hud'),
+  setHudSize: (width, height) => ipcRenderer.invoke('set-hud-size', width, height),
+  openInEditor: folderPath => ipcRenderer.invoke('open-in-editor', folderPath),
+  openExternal: url => ipcRenderer.invoke('open-external', url)
 });

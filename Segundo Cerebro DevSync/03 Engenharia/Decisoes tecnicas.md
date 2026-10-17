@@ -1,7 +1,7 @@
 ---
 tipo: engenharia
-versao: "0.7.0"
-atualizado: 2026-10-16
+versao: "0.8.0"
+atualizado: 2026-10-17
 tags: [devsync, engenharia]
 cssclasses: [devsync]
 fontes: ["docs/ADR-001.md","docs/ADR-002.md"]
@@ -12,6 +12,9 @@ As decisões registram a arquitetura e garantem que o DevSync permaneça seguro,
 
 | Decisão | Motivo | Consequência |
 | --- | --- | --- |
+| AI Morning Catch-Up & Retomada de Contexto com Fallback Heurístico | Reintroduzir o desenvolvedor no contexto de trabalho instantaneamente ao mudar de ambiente (Casa vs Trabalho) | Analisa commits e diffs, extrai pendências técnicas (`TODO`/`FIXME`), sugere próximos passos e persiste automaticamente na nota diária do Obsidian sem depender obrigatoriamente de chaves externas de IA |
+| HUD Spotlight Command Palette com IPC Nativo e Redimensionamento Dinâmico | Transformar o HUD passivo numa ferramenta de ação e navegação rápida instantânea | Janela frameless redimensiona dinamicamente entre 320x52 (pílula) e 460x420 (Spotlight), integrando busca fuzzy, atalhos rápidos (`Alt+C` para VS Code, `Alt+G` para GitHub, `Alt+D` para Diffs, `Enter` para sincronizar) |
+| Protocolo MCP via stdio (17 ferramentas) | Integração de nível de sistema para agentes de IA autônomos | Adição de `devsync_catch_up` permitindo que LLMs invoquem o briefing matinal |
 | P2P Direct LAN com UDP Beacon (Porta 48123) | Permite que instâncias do DevSync na mesma rede local se descubram sem configuração de IP | Descoberta automática zero-configuração via broadcasts UDP a cada 5 segundos |
 | Git Bundles binários para transporte P2P | Sincroniza commits completos diretamente entre máquinas sem depender de servidor remoto ou GitHub | Comunicação direta e à prova de quedas de conexão externa à internet |
 | Git Worktrees isoladas em `.devsync/worktrees/` | Permite sincronizar branches secundárias em background sem trocar a branch ativa | O desenvolvedor não sofre interrupções no editor nem stashes forçados |

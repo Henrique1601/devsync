@@ -158,3 +158,113 @@ ${diffText.slice(0, 3000)}`;
   }
 }
 
+export function heuristicCatchUpSummary({ project = {}, commits = [], diffText = '', todos = [] } = {}) {
+  const pName = project.name || project.id || 'Projeto';
+  const foundTodos = [...todos];
+
+  if (!foundTodos.length && diffText) {
+    const todoMatches = diffText.matchAll(/(?:^[+]|[+]\s*)(?:(?:\/\/|#|\/\*)\s*(?:TODO|FIXME|HACK):?\s*)([^\r\n]+)/gmi);
+    for (const m of todoMatches) {
+      if (m[1] && m[1].trim()) foundTodos.push(m[1].trim());
+      if (foundTodos.length >= 5) break;
+    }
+  }
+
+  const commitList = Array.isArray(commits) ? commits : [];
+  const highlights = [];
+
+  if (commitList.length) {
+    for (const c of commitList.slice(0, 3)) {
+      const clean = typeof c === 'string' ? c.replace(/^[0-9a-f]+\s+/, '') : (c.message || '');
+      if (clean) highlights.push(clean);
+    }
+  } else {
+    highlights.push('Sincronização recente em dia sem novos commits.');
+  }
+
+  let summary = `Você sincronizou ${commitList.length || 0} commit(s) recente(s) no projeto ${pName}.`;
+  if (commitList.some(c => String(c).includes('feat:'))) {
+    summary = `Novas funcionalidades foram adicionadas em ${pName} durante a sessão anterior.`;
+  } else if (commitList.some(c => String(c).includes('fix:'))) {
+    summary = `Correções de bugs e ajustes foram aplicados em ${pName}.`;
+  }
+
+  let nextStep = 'Revisar os arquivos alterados e retomar o desenvolvimento.';
+  if (foundTodos.length > 0) {
+    nextStep = `Resolver a pendência: "${foundTodos[0]}".`;
+  } else if (commitList.some(c => String(c).toLowerCase().includes('test'))) {
+    nextStep = 'Executar a suíte de testes unitários para validar as alterações.';
+  } else if (diffText.includes('package.json')) {
+    nextStep = 'Verificar se há novas dependências para instalar (npm install).';
+  }
+
+  return {
+    projectName: pName,
+    summary,
+    highlights,
+    todos: foundTodos,
+    nextStep,
+    method: 'heuristic',
+    timestamp: new Date().toISOString()
+  };
+}
+
+export async function generateCatchUpSummary({ project = {}, commits = [], diffText = '', todos = [], apiKey = process.env.GEMINI_API_KEY, model = 'gemini-2.5-flash' } = {}) {
+  if (!apiKey) {
+    return heuristicCatchUpSummary({ project, commits, diffText, todos });
+  }
+
+  try {
+    const pName = project.name || project.id || 'Projeto';
+    const prompt = `Você é o assistente executivo matinal do DevSync. O desenvolvedor acabou de ligar o computador (Casa ou Trabalho) e recebeu atualizações do outro computador.
+Projeto: ${pName}
+Commits recebidos:
+${commits.slice(0, 5).map(c => `- ${typeof c === 'string' ? c : c.message}`).join('\n') || '- Nenhum commit explícito'}
+
+Diff resumido:
+${(diffText || '').slice(0, 3500)}
+
+TODOs pendentes encontrados:
+${todos.slice(0, 5).map(t => `- ${t}`).join('\n') || '- Nenhum TODO detectado'}
+
+TAREFA:
+Gere um briefing executivo matinal em português no formato JSON estrito:
+{
+  "summary": "Resumo de 1-2 frases do que foi codificado no outro computador",
+  "highlights": ["ponto importante 1", "ponto importante 2"],
+  "todos": ["pendência 1 se houver"],
+  "nextStep": "Próxima ação prática imediata recomendada para iniciar o trabalho"
+}
+Não inclua crases markdown envolta do JSON.`;
+
+    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: { responseMimeType: 'application/json' }
+      }),
+      signal: AbortSignal.timeout(8000)
+    });
+
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const data = await response.json();
+    const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    const parsed = JSON.parse(rawText.trim());
+
+    return {
+      projectName: pName,
+      summary: parsed.summary || `Sessão anterior sincronizada para ${pName}.`,
+      highlights: parsed.highlights || [],
+      todos: parsed.todos?.length ? parsed.todos : todos,
+      nextStep: parsed.nextStep || 'Iniciar verificando os testes e branch atual.',
+      method: 'gemini-ai',
+      timestamp: new Date().toISOString()
+    };
+  } catch {
+    return heuristicCatchUpSummary({ project, commits, diffText, todos });
+  }
+}
+
+

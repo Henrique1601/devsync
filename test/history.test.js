@@ -49,3 +49,41 @@ test('generateDailySummary compiles history entries into Obsidian daily log mark
   assert.match(fileContent, /Sincronizações executadas:\*\* 1/);
 });
 
+test('catchUpSummary injects and updates morning catch-up section in Obsidian daily note', async t => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), 'devsync-history-catchup-'));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const history = await createHistory({ directory });
+  const today = new Date().toISOString().slice(0, 10);
+  const vaultPath = path.join(directory, 'vault');
+
+  const catchUpData = {
+    projectName: 'API Gateway',
+    summary: 'Sincronizados 3 novos endpoints de autenticação e logs.',
+    highlights: ['feat(auth): token rotation', 'fix: rate limiting'],
+    todos: ['TODO: add integration test for redis cache'],
+    nextStep: 'Adicionar teste de integração para o cache Redis.',
+    method: 'heuristic',
+    timestamp: new Date().toISOString()
+  };
+
+  const res = await history.catchUpSummary(catchUpData, { vaultPath, date: today });
+  assert.equal(res.projectName, 'API Gateway');
+  assert.equal(res.date, today);
+
+  let fileContent = await readFile(res.file, 'utf8');
+  assert.match(fileContent, /## 🌅 Resumo Matinal & Retomada de Contexto \(API Gateway\)/);
+  assert.match(fileContent, /Sincronizados 3 novos endpoints/);
+  assert.match(fileContent, /TODO: add integration test/);
+  assert.match(fileContent, /Adicionar teste de integração/);
+
+  // Calling it again updates the section rather than duplicating it
+  catchUpData.summary = 'Resumo atualizado da sessão matinal.';
+  await history.catchUpSummary(catchUpData, { vaultPath, date: today });
+
+  fileContent = await readFile(res.file, 'utf8');
+  assert.match(fileContent, /Resumo atualizado da sessão matinal/);
+  const occurrences = fileContent.split('## 🌅 Resumo Matinal & Retomada de Contexto (API Gateway)').length - 1;
+  assert.equal(occurrences, 1);
+});
+
+

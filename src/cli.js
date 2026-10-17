@@ -32,6 +32,7 @@ try {
   devsync scout [pasta]                  Varre e descobre repositórios Git no computador
   devsync worktree-sync <id> <branch>    Sincroniza branch secundária via worktree isolada
   devsync daily-summary [data]           Gera diário de bordo e resumo de produtividade no Obsidian
+  devsync catch-up [id]                  Briefing matinal executivo e retomada de contexto com IA
   devsync p2p-peers                      Lista outros computadores DevSync na rede local (LAN)
   devsync settings <id> <intervalo> <espera> <padrões separados por vírgula>
   devsync sync <id>                       Sincroniza projeto agora (ou --all para todos)
@@ -69,6 +70,7 @@ Checkpoints e envio são optativos e começam desativados.`);
         : normalized === 'scout' ? { command: normalized, path: argument }
         : normalized === 'worktree-sync' ? { command: normalized, id: argument, branch: extra }
         : normalized === 'daily-summary' ? { command: normalized, date: argument }
+        : normalized === 'catch-up' ? { command: normalized, id: argument }
         : normalized === 'scan-secrets' ? { command: normalized, id: argument }
         : normalized === 'ai-resolve' ? { command: normalized, id: argument, file: extra }
         : normalized === 'stash-sync' ? { command: normalized, id: argument, pop: extra !== '--no-pop' }

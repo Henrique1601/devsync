@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Tray, Menu, nativeImage, dialog, ipcMain, Notification, session, globalShortcut } = require('electron');
+const { app, BrowserWindow, Tray, Menu, nativeImage, dialog, ipcMain, Notification, session, globalShortcut, shell } = require('electron');
 const path = require('node:path');
 const { pathToFileURL } = require('node:url');
 const { deflateSync } = require('node:zlib');
@@ -43,7 +43,7 @@ async function show() { if (window) { window.show(); window.focus(); return; }
 async function showHud() {
   if (hudWindow) { hudWindow.show(); hudWindow.focus(); return; }
   hudWindow = new BrowserWindow({
-    show: !smoke, width: 280, height: 52, frame: false, transparent: true, alwaysOnTop: true, skipTaskbar: true, resizable: false,
+    show: !smoke, width: 320, height: 52, frame: false, transparent: true, alwaysOnTop: true, skipTaskbar: true, resizable: false,
     webPreferences: { preload: path.join(__dirname,'preload.cjs'), nodeIntegration: false, contextIsolation: true, sandbox: true }
   });
   hudWindow.webContents.setWindowOpenHandler(() => ({ action:'deny' }));
@@ -78,6 +78,29 @@ else {
       ipcMain.handle('show-main', () => show());
       ipcMain.handle('close-hud', () => closeHud());
       ipcMain.handle('toggle-hud', () => toggleHud());
+      ipcMain.handle('set-hud-size', (event, width, height) => {
+        if (!trusted(event)) throw Error('Origem inválida.');
+        if (hudWindow && typeof width === 'number' && typeof height === 'number') {
+          hudWindow.setSize(width, height);
+          return true;
+        }
+        return false;
+      });
+      ipcMain.handle('open-in-editor', (event, folderPath) => {
+        if (!trusted(event)) throw Error('Origem inválida.');
+        if (typeof folderPath !== 'string') return false;
+        const { spawn } = require('node:child_process');
+        spawn('code', [folderPath], { shell: true, detached: true, stdio: 'ignore' }).unref();
+        return true;
+      });
+      ipcMain.handle('open-external', (event, url) => {
+        if (!trusted(event)) throw Error('Origem inválida.');
+        if (typeof url === 'string' && (url.startsWith('https://') || url.startsWith('http://'))) {
+          shell.openExternal(url);
+          return true;
+        }
+        return false;
+      });
       const supportedUpdates = app.isPackaged && process.platform === 'win32';
       const { createUpdateController, isAllowedUpdateRequest } = require('./updates.cjs');
       updates = createUpdateController({

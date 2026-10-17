@@ -1,7 +1,7 @@
 ---
 tipo: referencia
-versao: "0.7.0"
-atualizado: 2026-10-16
+versao: "0.8.0"
+atualizado: 2026-10-17
 tags: [devsync, referencia]
 cssclasses: [devsync]
 fontes: ["src/cli.js"]
@@ -17,13 +17,18 @@ Set-Location "C:/Users/henri/Programacao/Projetos/devsync"
 npm start
 ```
 
-## Atalhos Globais de Teclado (Windows Desktop)
+## Atalhos Globais de Teclado & Spotlight (Windows Desktop)
 
 | Atalho | Ação |
 | --- | --- |
 | `Ctrl+Shift+S` | Dispara a sincronização de todos os projetos ativos com notificação |
 | `Ctrl+Shift+D` | Abre / foca a janela principal do DevSync |
-| `Ctrl+Shift+H` | Alterna a exibição do DevSync Dynamic HUD (pílula flutuante translúcida) |
+| `Ctrl+Shift+H` | Alterna a exibição do DevSync Dynamic HUD (pílula flutuante translúcida / Spotlight) |
+| `Alt+C` (no HUD) | Abre o projeto selecionado diretamente no VS Code |
+| `Alt+G` (no HUD) | Abre o repositório do projeto selecionado no GitHub |
+| `Alt+D` (no HUD) | Abre o painel local para inspeção de Diffs do projeto |
+| `Enter` (no HUD) | Dispara sincronização instantânea do projeto selecionado |
+| `Esc` (no HUD) | Recolhe a Command Palette de volta para a pílula compacta |
 
 ## Consultar e cadastrar
 
@@ -36,6 +41,16 @@ node src/cli.js diagnose "C:/Projetos/meu-crm"
 node src/cli.js add "C:/Projetos/meu-crm"
 node src/cli.js clone "https://github.com/usuario/projeto.git" "C:/Projetos/nova-pasta"
 node src/cli.js history ID_DO_PROJETO 100
+```
+
+## AI Morning Catch-Up & Retomada de Contexto
+
+```powershell
+# Gerar briefing matinal com IA/heurística e registrar no diário do Obsidian
+node src/cli.js catch-up ID_DO_PROJETO
+
+# Briefing do primeiro projeto ativo ou de todos
+node src/cli.js catch-up
 ```
 
 ## Repo Scout & Worktrees
@@ -52,7 +67,7 @@ node src/cli.js worktree-sync ID_DO_PROJETO feature-login
 
 ```powershell
 # Gerar diário de bordo e resumo de produtividade em Markdown no Obsidian
-node src/cli.js daily-summary 2026-10-16
+node src/cli.js daily-summary 2026-10-17
 
 # Listar instâncias do DevSync detectadas na rede local via UDP Beacon
 node src/cli.js p2p-peers
