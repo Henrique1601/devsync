@@ -6,7 +6,7 @@ test('MCP server handles initialize, ping and tools/list', async () => {
   const init = await handleMcpMessage({ jsonrpc: '2.0', id: 1, method: 'initialize', params: {} });
   assert.equal(init.id, 1);
   assert.equal(init.result.serverInfo.name, 'devsync-mcp');
-  assert.equal(init.result.serverInfo.version, '0.6.0');
+  assert.equal(init.result.serverInfo.version, '0.7.0');
 
   const ping = await handleMcpMessage({ jsonrpc: '2.0', id: 2, method: 'ping' });
   assert.equal(ping.id, 2);
@@ -28,6 +28,10 @@ test('MCP server handles initialize, ping and tools/list', async () => {
   assert.ok(toolNames.includes('devsync_scan_secrets'));
   assert.ok(toolNames.includes('devsync_ai_resolve_conflict'));
   assert.ok(toolNames.includes('devsync_resolve_conflict'));
+  assert.ok(toolNames.includes('devsync_scout'));
+  assert.ok(toolNames.includes('devsync_worktree_sync'));
+  assert.ok(toolNames.includes('devsync_daily_summary'));
+  assert.ok(toolNames.includes('devsync_p2p_peers'));
 });
 
 test('MCP server dispatches tools/call to daemon dependency injection', async () => {

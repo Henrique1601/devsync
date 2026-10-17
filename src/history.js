@@ -45,6 +45,70 @@ export async function createHistory({ directory = home, maxEntries = 1000 } = {}
       if (!Number.isInteger(limit) || limit < 1 || limit > 1000) throw new Error('Limite do histórico deve ser inteiro entre 1 e 1000.');
       const matching = entries.filter(entry => !projectId || entry.projectId === projectId);
       return { entries: matching.slice(-limit).reverse(), total: matching.length };
+    },
+    dailySummary(options) {
+      return generateDailySummary(entries, options);
     }
   };
 }
+
+export async function generateDailySummary(entries, { date = new Date().toISOString().slice(0, 10), vaultPath = path.resolve(process.cwd(), 'Segundo Cerebro DevSync') } = {}) {
+  const dayEntries = entries.filter(e => (e.finishedAt || e.startedAt || '').startsWith(date));
+  const totalSyncs = dayEntries.filter(e => ['sync', 'stash-sync'].includes(e.action)).length;
+  const receivedCommits = dayEntries.reduce((acc, e) => acc + (e.receivedCommits || 0), 0);
+  const sentCommits = dayEntries.reduce((acc, e) => acc + (e.sentCommits || 0), 0);
+  const checkpoints = dayEntries.filter(e => e.checkpointCreated).length;
+
+  const projectMap = new Map();
+  for (const e of dayEntries) {
+    const pName = e.projectName || e.projectId || 'desconhecido';
+    if (!projectMap.has(pName)) {
+      projectMap.set(pName, { syncs: 0, received: 0, sent: 0, checkpoints: 0, states: new Set() });
+    }
+    const stat = projectMap.get(pName);
+    if (['sync', 'stash-sync'].includes(e.action)) stat.syncs++;
+    stat.received += e.receivedCommits || 0;
+    stat.sent += e.sentCommits || 0;
+    if (e.checkpointCreated) stat.checkpoints++;
+    if (e.state) stat.states.add(e.state);
+  }
+
+  const projectRows = Array.from(projectMap.entries()).map(([name, s]) =>
+    `| **${name}** | ${s.syncs} | ${s.received} | ${s.sent} | ${s.checkpoints} | ${Array.from(s.states).join(', ') || 'synced'} |`
+  ).join('\n');
+
+  const content = `---
+tipo: diario
+data: ${date}
+tags: [devsync, diario, produtividade]
+cssclasses: [devsync]
+---
+# 📅 Diário de Bordo DevSync — ${date}
+
+## 📊 Resumo Executivo da Jornada
+- **Sincronizações executadas:** ${totalSyncs}
+- **Commits recebidos:** ${receivedCommits}
+- **Commits enviados:** ${sentCommits}
+- **Checkpoints criados:** ${checkpoints}
+- **Eventos registrados:** ${dayEntries.length}
+
+## 🔄 Atividade por Projeto
+
+| Projeto | Sincronizações | Commits Recebidos | Commits Enviados | Checkpoints | Estados Observados |
+| :--- | :---: | :---: | :---: | :---: | :--- |
+${projectRows || '| *Nenhum projeto movimentado nesta data* | 0 | 0 | 0 | 0 | — |'}
+
+## 📝 Linha do Tempo dos Eventos
+${dayEntries.slice(-15).reverse().map(e => `- **${(e.finishedAt || e.startedAt || '').slice(11, 19)}** — [${e.action}] ${e.projectName || e.projectId}: ${e.reason || e.state || 'concluído'}`).join('\n') || '- Nenhum evento registrado.'}
+
+← [[00 Comece aqui]]
+`;
+
+  const targetDir = path.join(vaultPath, '05 Registros');
+  await mkdir(targetDir, { recursive: true });
+  const targetFile = path.join(targetDir, `${date} - Resumo Diario.md`);
+  await writeFile(targetFile, content, 'utf8');
+
+  return { date, file: targetFile, totalSyncs, receivedCommits, sentCommits, checkpoints, projectsCount: projectMap.size };
+}
+

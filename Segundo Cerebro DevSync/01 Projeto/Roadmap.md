@@ -1,6 +1,6 @@
 ---
 tipo: planejamento
-versao: "0.6.0"
+versao: "0.7.0"
 atualizado: 2026-10-16
 tags: [devsync, planejamento]
 cssclasses: [devsync]
@@ -10,7 +10,16 @@ fontes: ["docs/VALIDATION.md","docs/DEPLOYMENT.md"]
 
 Use esta nota para acompanhar o ciclo de entregas e os próximos passos do DevSync.
 
-## Concluído na Versão 0.6.0 (Master Upgrade)
+## Concluído na Versão 0.7.0 (Next-Gen Innovation Release)
+
+- [x] **AI Conventional Commit Generator & Diário de Bordo no Obsidian:** Análise semântica e heurística de diffs para gerar mensagens padronizadas e relatórios diários de produtividade no Obsidian.
+- [x] **P2P Direct LAN Sync via UDP Beacon e Git Bundles:** Sincronização direta na rede local entre Casa e Trabalho mesmo sem internet ou GitHub.
+- [x] **Repo Scout (Auto-Discovery de Repositórios & Cadastro em Lote):** Varredura inteligente de pastas para cadastrar múltiplos repositórios com 1 clique.
+- [x] **Multi-Branch Sync via Git Worktrees Isoladas:** Sincronização em segundo plano de branches secundárias sem interferir na branch ativa do desenvolvedor.
+- [x] **DevSync Dynamic HUD:** Pílula flutuante translúcida no desktop do Windows (atalho `Ctrl+Shift+H`) com status em tempo real e sincronização instantânea.
+- [x] **Expansão MCP para 16 Ferramentas:** Ferramentas dedicadas para agentes de IA realizarem scout, worktree sync, resumos no Obsidian e consultas P2P.
+
+## Concluído na Versão 0.6.0
 
 - [x] Motor Zero-Leak Pre-Commit Secret Scanner (`src/secrets.js`).
 - [x] Resolução Semântica de Conflitos com IA e Fallback Heurístico (`src/ai.js`).
@@ -18,7 +27,6 @@ Use esta nota para acompanhar o ciclo de entregas e os próximos passos do DevSy
 - [x] Atalhos Globais de Sistema (`Ctrl+Shift+S`, `Ctrl+Shift+D`) no Desktop Windows (`desktop/main.cjs`).
 - [x] Sincronização e envio de Tags Git (`src/git.js`).
 - [x] Expansão do Servidor MCP para 12 ferramentas corporativas.
-- [x] Suíte de testes expandida para 55 testes 100% aprovados.
 
 ## Concluído na Versão 0.5.0
 
@@ -30,11 +38,11 @@ Use esta nota para acompanhar o ciclo de entregas e os próximos passos do DevSy
 - [x] Diagnóstico de Credenciais Git e chaves SSH no Onboarding.
 - [x] Suporte a PWA mobile no painel remoto com manifest e layout touch-friendly.
 
-## Próximos Passos (v0.7.0+)
+## Próximos Passos (v0.8.0+)
 
-- [ ] Instalação e teste contínuo em paridade total nos dois computadores físicos (Casa e Trabalho).
 - [ ] Validação de assinatura de código (code-signing) com certificado EV para suprimir alertas do Windows Defender SmartScreen.
 - [ ] Suporte a múltiplos coordenadores remotos em cluster (alta disponibilidade).
+- [ ] Criptografia end-to-end com curvas elípticas (Ed25519) nos payloads P2P LAN.
 
 Procedimento operacional: [[03 Engenharia/Hospedagem e operacao]].
 

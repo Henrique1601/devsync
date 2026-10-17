@@ -1,6 +1,6 @@
 ---
 tipo: referencia
-versao: "0.6.0"
+versao: "0.7.0"
 atualizado: 2026-10-16
 tags: [devsync, referencia]
 cssclasses: [devsync]
@@ -23,6 +23,7 @@ npm start
 | --- | --- |
 | `Ctrl+Shift+S` | Dispara a sincronização de todos os projetos ativos com notificação |
 | `Ctrl+Shift+D` | Abre / foca a janela principal do DevSync |
+| `Ctrl+Shift+H` | Alterna a exibição do DevSync Dynamic HUD (pílula flutuante translúcida) |
 
 ## Consultar e cadastrar
 
@@ -35,6 +36,26 @@ node src/cli.js diagnose "C:/Projetos/meu-crm"
 node src/cli.js add "C:/Projetos/meu-crm"
 node src/cli.js clone "https://github.com/usuario/projeto.git" "C:/Projetos/nova-pasta"
 node src/cli.js history ID_DO_PROJETO 100
+```
+
+## Repo Scout & Worktrees
+
+```powershell
+# Varrer e descobrir repositórios Git em pastas locais
+node src/cli.js scout "C:/Users/henri/Programacao"
+
+# Sincronizar branch secundária em background via worktree isolada
+node src/cli.js worktree-sync ID_DO_PROJETO feature-login
+```
+
+## Diário de Bordo no Obsidian & P2P LAN
+
+```powershell
+# Gerar diário de bordo e resumo de produtividade em Markdown no Obsidian
+node src/cli.js daily-summary 2026-10-16
+
+# Listar instâncias do DevSync detectadas na rede local via UDP Beacon
+node src/cli.js p2p-peers
 ```
 
 ## Controle e diagnóstico Git
@@ -75,7 +96,7 @@ node src/cli.js webhook-off
 
 ## Servidor MCP (Agentes de IA)
 
-Para conectar ferramentas como Claude Code, Cursor ou Antigravity via stdio com as 12 ferramentas disponíveis:
+Para conectar ferramentas como Claude Code, Cursor ou Antigravity via stdio com as 16 ferramentas disponíveis:
 
 ```powershell
 node src/cli.js mcp

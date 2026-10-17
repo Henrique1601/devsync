@@ -14,7 +14,8 @@ try {
     const { startMcpServer } = await import('./mcp.js');
     await startMcpServer();
   }
-  else if (command === 'help') console.log(`DevSync 0.5 — Node.js 22+ e Git
+  else if (command === 'help') {
+    console.log(`DevSync 0.7 — Node.js 22+ e Git
 
   devsync daemon                         Inicia serviço local
   devsync mcp                            Inicia servidor MCP (Model Context Protocol) via stdio
@@ -28,6 +29,10 @@ try {
   devsync predict-conflicts <id>         Simula em memória se haverá conflitos no Git
   devsync scan-secrets <id>              Analisa arquivos alterados contra vazamento de chaves
   devsync ai-resolve <id> <arquivo>      Gera resolução semântica do conflito usando IA
+  devsync scout [pasta]                  Varre e descobre repositórios Git no computador
+  devsync worktree-sync <id> <branch>    Sincroniza branch secundária via worktree isolada
+  devsync daily-summary [data]           Gera diário de bordo e resumo de produtividade no Obsidian
+  devsync p2p-peers                      Lista outros computadores DevSync na rede local (LAN)
   devsync settings <id> <intervalo> <espera> <padrões separados por vírgula>
   devsync sync <id>                       Sincroniza projeto agora (ou --all para todos)
   devsync sync-all                       Sincroniza todos os projetos ativos em lote
@@ -48,7 +53,7 @@ try {
 Aplicativo desktop: npm run desktop
 Instalador Windows: npm run dist
 Checkpoints e envio são optativos e começam desativados.`);
-  else {
+  } else {
     const runtime = await read('runtime.json');
     const url = `http://127.0.0.1:${runtime.port}`;
     if (command === 'dashboard') console.log(`${url}/#${runtime.token}`);
@@ -60,7 +65,10 @@ Checkpoints e envio são optativos e começam desativados.`);
         : normalized === 'remote-config' ? { command: normalized, settings: { url: argument, token: extra, deviceId, name } }
         : normalized === 'check-remote' ? { command: normalized, url: argument }
         : normalized === 'webhook-config' ? { command: normalized, settings: { url: argument, service: extra, chatId: deviceId } }
-        : ['webhook-test', 'webhook-off'].includes(normalized) ? { command: normalized }
+        : ['webhook-test', 'webhook-off', 'p2p-peers'].includes(normalized) ? { command: normalized }
+        : normalized === 'scout' ? { command: normalized, path: argument }
+        : normalized === 'worktree-sync' ? { command: normalized, id: argument, branch: extra }
+        : normalized === 'daily-summary' ? { command: normalized, date: argument }
         : normalized === 'scan-secrets' ? { command: normalized, id: argument }
         : normalized === 'ai-resolve' ? { command: normalized, id: argument, file: extra }
         : normalized === 'stash-sync' ? { command: normalized, id: argument, pop: extra !== '--no-pop' }

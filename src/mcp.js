@@ -132,6 +132,46 @@ export const MCP_TOOLS = [
       required: ['id', 'file', 'resolvedCode'],
       additionalProperties: false
     }
+  },
+  {
+    name: 'devsync_scout',
+    description: 'Varre diretórios locais e descobre repositórios Git existentes para cadastro.',
+    inputSchema: {
+      type: 'object',
+      properties: { path: { type: 'string', description: 'Diretório raiz para varredura recursiva (opcional).' } },
+      additionalProperties: false
+    }
+  },
+  {
+    name: 'devsync_worktree_sync',
+    description: 'Sincroniza uma branch secundária em uma worktree Git isolada sem mexer na branch ativa de trabalho.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        id: { type: 'string', description: 'ID do projeto cadastrado.' },
+        branch: { type: 'string', description: 'Nome da branch a sincronizar (ex: main, develop).' }
+      },
+      required: ['id', 'branch'],
+      additionalProperties: false
+    }
+  },
+  {
+    name: 'devsync_daily_summary',
+    description: 'Gera um diário de bordo e resumo de produtividade do dia gravado no cofre Obsidian do DevSync.',
+    inputSchema: {
+      type: 'object',
+      properties: { date: { type: 'string', description: 'Data no formato YYYY-MM-DD (padrão: hoje).' } },
+      additionalProperties: false
+    }
+  },
+  {
+    name: 'devsync_p2p_peers',
+    description: 'Lista outros computadores DevSync detectados na rede local (LAN via UDP beacon).',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+      additionalProperties: false
+    }
   }
 ];
 
@@ -190,6 +230,15 @@ export async function executeMcpTool(name, args = {}, { callDaemon = defaultDaem
     case 'devsync_pause_resume':
       if (!args.id || !['pause', 'resume'].includes(args.action)) throw new Error('Informe id e action (pause ou resume).');
       return callDaemon('command', { command: args.action, id: String(args.id) });
+    case 'devsync_scout':
+      return callDaemon('command', { command: 'scout', path: args.path ? String(args.path) : undefined });
+    case 'devsync_worktree_sync':
+      if (!args.id || !args.branch) throw new Error('Informe id e branch.');
+      return callDaemon('command', { command: 'worktree-sync', id: String(args.id), branch: String(args.branch) });
+    case 'devsync_daily_summary':
+      return callDaemon('command', { command: 'daily-summary', date: args.date ? String(args.date) : undefined });
+    case 'devsync_p2p_peers':
+      return callDaemon('command', { command: 'p2p-peers' });
     default:
       throw new Error(`Ferramenta MCP desconhecida: ${name}`);
   }
@@ -208,7 +257,7 @@ export async function handleMcpMessage(message, deps = {}) {
         result: {
           protocolVersion: message.params?.protocolVersion || '2024-11-05',
           capabilities: { tools: {} },
-          serverInfo: { name: 'devsync-mcp', version: '0.6.0' }
+          serverInfo: { name: 'devsync-mcp', version: '0.7.0' }
         }
       };
     }

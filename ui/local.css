@@ -14,6 +14,13 @@ dialog.modal-large{width:min(1100px,96vw);max-height:90vh}
 .merge-readonly{background:rgba(0,0,0,.25);overflow-y:auto;max-height:220px;min-height:220px;padding:10px;border-radius:8px;border:1px solid var(--line);font-family:Consolas,monospace;font-size:12px;white-space:pre-wrap;line-height:1.45}
 .secret-item{padding:12px 14px;background:rgba(252,165,165,.08);border:1px solid var(--danger);border-radius:8px;margin-bottom:8px}
 .secret-safe{padding:16px;background:rgba(110,231,183,.08);border:1px solid var(--ok);border-radius:8px;color:var(--ok)}
+.scout-results-container{margin-top:16px;display:flex;flex-direction:column;gap:8px}
+.scout-item{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 16px;background:var(--input-bg);border:1px solid var(--line);border-radius:10px}
+.scout-meta{display:flex;flex-direction:column;gap:4px;min-width:0;flex:1}
+.scout-meta strong{font-size:14px;overflow-wrap:anywhere}
+.scout-meta span{font-size:12px;color:var(--muted)}
+.scout-actions{display:flex;align-items:center;gap:8px}
+.p2p-peer-card{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--input-bg);border:1px solid var(--line);border-radius:8px;margin-bottom:8px}
 @media(max-width:860px){.merge-grid{grid-template-columns:1fr}}
 @media(max-width:640px){body{padding:24px 16px}.badge{display:none}nav{gap:6px}nav button{padding:10px;font-size:13px}.grid{grid-template-columns:1fr}.row{flex-wrap:wrap}.row input{flex-basis:100%}section,.history-entry{padding:18px}.actions button{flex:1 1 auto}h2{font-size:22px}}
 @media(prefers-reduced-motion:reduce){button,body{transition:none}button:active{transform:none}}

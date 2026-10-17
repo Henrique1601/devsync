@@ -2,10 +2,11 @@ const { app, BrowserWindow, Tray, Menu, nativeImage, dialog, ipcMain, Notificati
 const path = require('node:path');
 const { pathToFileURL } = require('node:url');
 const { deflateSync } = require('node:zlib');
-let window, tray, service, runtime, quitting = false, pollTimer, updateTimer, updateInitialTimer, updates, stopPromise;
+let window, hudWindow, tray, service, runtime, quitting = false, pollTimer, updateTimer, updateInitialTimer, updates, stopPromise;
 function stopOnce() {
   clearInterval(pollTimer); clearInterval(updateTimer); clearTimeout(updateInitialTimer);
   try { globalShortcut?.unregisterAll(); } catch {}
+  try { hudWindow?.close(); } catch {}
   return stopPromise ||= Promise.resolve().then(() => service?.stop());
 }
 const smoke = process.argv.includes('--smoke-test');
@@ -27,7 +28,10 @@ function icon() {
   for(let y=0;y<32;y++)for(let x=0;x<32;x++){const i=y*129+1+x*4;const light=(x>=8&&x<=11&&y>=7&&y<=24)||(x>=12&&x<=21&&(y<=10&&y>=7||y>=21&&y<=24))||(x>=21&&x<=24&&y>=10&&y<=21);pixels.set(light?[232,239,255,255]:[34,56,92,255],i)}
   return nativeImage.createFromBuffer(Buffer.concat([Buffer.from('89504e470d0a1a0a','hex'),chunk('IHDR',header),chunk('IDAT',deflateSync(pixels)),chunk('IEND',Buffer.alloc(0))]));
 }
-function trusted(event) { return window && event.sender === window.webContents && event.senderFrame === window.webContents.mainFrame && new URL(event.senderFrame.url).origin === `http://127.0.0.1:${runtime.port}`; }
+function trusted(event) {
+  const matchWin = (window && event.sender === window.webContents) || (hudWindow && event.sender === hudWindow.webContents);
+  return matchWin && new URL(event.senderFrame.url).origin === `http://127.0.0.1:${runtime.port}`;
+}
 async function show() { if (window) { window.show(); window.focus(); return; }
   window = new BrowserWindow({ show: !smoke, width: 1120, height: 820, minWidth: 720, title: 'DevSync', icon: icon(), webPreferences: { preload: path.join(__dirname,'preload.cjs'), nodeIntegration: false, contextIsolation: true, sandbox: true } });
   window.webContents.setWindowOpenHandler(() => ({ action:'deny' }));
@@ -36,6 +40,21 @@ async function show() { if (window) { window.show(); window.focus(); return; }
   window.on('closed', () => { window = null; });
   await window.loadURL(`http://127.0.0.1:${runtime.port}/#${runtime.token}`);
 }
+async function showHud() {
+  if (hudWindow) { hudWindow.show(); hudWindow.focus(); return; }
+  hudWindow = new BrowserWindow({
+    show: !smoke, width: 280, height: 52, frame: false, transparent: true, alwaysOnTop: true, skipTaskbar: true, resizable: false,
+    webPreferences: { preload: path.join(__dirname,'preload.cjs'), nodeIntegration: false, contextIsolation: true, sandbox: true }
+  });
+  hudWindow.webContents.setWindowOpenHandler(() => ({ action:'deny' }));
+  hudWindow.on('closed', () => { hudWindow = null; });
+  await hudWindow.loadURL(`http://127.0.0.1:${runtime.port}/hud.html#${runtime.token}`);
+}
+function toggleHud() {
+  if (hudWindow && hudWindow.isVisible()) hudWindow.hide();
+  else showHud();
+}
+function closeHud() { if (hudWindow) hudWindow.close(); }
 if (!app.requestSingleInstanceLock()) app.quit();
 else {
   app.on('second-instance', () => show());
@@ -56,6 +75,9 @@ else {
       ipcMain.handle('choose-folder', async event => { if (!trusted(event)) throw Error('Origem inválida.');const result=await dialog.showOpenDialog(window,{properties:['openDirectory']});return result.canceled?null:result.filePaths[0]; });
       ipcMain.handle('startup-get', event => { if(!trusted(event))throw Error('Origem inválida.');bridgeReady=true;return app.getLoginItemSettings({path:process.execPath,args:startupArgs}).openAtLogin; });
       ipcMain.handle('startup-set', (event, enabled) => { if(!trusted(event)||typeof enabled!=='boolean')throw Error('Pedido inválido.');app.setLoginItemSettings({openAtLogin:enabled,path:process.execPath,args:startupArgs});return app.getLoginItemSettings({path:process.execPath,args:startupArgs}).openAtLogin; });
+      ipcMain.handle('show-main', () => show());
+      ipcMain.handle('close-hud', () => closeHud());
+      ipcMain.handle('toggle-hud', () => toggleHud());
       const supportedUpdates = app.isPackaged && process.platform === 'win32';
       const { createUpdateController, isAllowedUpdateRequest } = require('./updates.cjs');
       updates = createUpdateController({
@@ -94,8 +116,11 @@ else {
         globalShortcut.register('CommandOrControl+Shift+D', () => {
           show();
         });
+        globalShortcut.register('CommandOrControl+Shift+H', () => {
+          toggleHud();
+        });
       } catch {}
-      tray.setContextMenu(Menu.buildFromTemplate([{label:'Abrir DevSync (Ctrl+Shift+D)',click:show},{label:'Sincronizar todos (Ctrl+Shift+S)',click:syncAllFromTray},{type:'separator'},{label:'Sair',click:()=>app.quit()}]));tray.on('double-click',show);
+      tray.setContextMenu(Menu.buildFromTemplate([{label:'Abrir DevSync (Ctrl+Shift+D)',click:show},{label:'Alternar Mini-HUD (Ctrl+Shift+H)',click:toggleHud},{label:'Sincronizar todos (Ctrl+Shift+S)',click:syncAllFromTray},{type:'separator'},{label:'Sair',click:()=>app.quit()}]));tray.on('double-click',show);
       const last = new Map(); let checking=false;
       pollTimer=setInterval(async()=>{if(checking)return;checking=true;try{const r=await fetch(`http://127.0.0.1:${runtime.port}/api/status`,{headers:{authorization:`Bearer ${runtime.token}`},signal:AbortSignal.timeout(5000)});if(!r.ok)return;const {projects}=await r.json();for(const p of projects){const previous=last.get(p.id);last.set(p.id,p.state);if(previous&&previous!==p.state&&['error','dirty','diverged','synced'].includes(p.state)&&Notification.isSupported())new Notification({title:'DevSync: '+p.name,body:p.state==='synced'?'Projeto sincronizado.':'O projeto precisa de atenção. Abra o DevSync para ver os detalhes.'}).show()}}catch{}finally{checking=false}},10000);
       if (!process.argv.includes('--background')) await show();

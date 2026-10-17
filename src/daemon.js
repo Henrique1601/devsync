@@ -9,6 +9,9 @@ import { validateWebhookSettings, sendWebhook } from './webhooks.js';
 import { calculateMetrics } from './metrics.js';
 import { scanDiff } from './secrets.js';
 import { resolveConflictAI } from './ai.js';
+import { scoutRepositories } from './scout.js';
+import { syncBranchWorktree } from './worktree.js';
+import { P2PManager } from './p2p.js';
 import { startRemote, validateRemote } from './remote-client.js';
 import { acquireServiceLock } from './service-lock.js';
 import { rulesFor, validateRules, isSyncDue } from './rules.js';
@@ -19,7 +22,7 @@ class CommandError extends Error {}
 export async function daemon() {
   await mkdir(home, { recursive: true, mode: 0o700 });
   const lock = await acquireServiceLock(home);
-  let server, timer, remote, signalStop;
+  let server, timer, remote, signalStop, p2p;
   let mutations = Promise.resolve();
   let stopping = false;
   try {
@@ -130,6 +133,40 @@ export async function daemon() {
         });
         if (!res?.ok) throw new CommandError('Falha no teste do webhook: ' + (res?.error || `status HTTP ${res?.status}`));
         return { ok: true, status: res.status };
+      }
+      if (data.command === 'scout') {
+        const rootPath = data.path || path.resolve(process.cwd(), '..');
+        const existingPaths = new Set(config.projects.map(p => p.path));
+        const repos = await scoutRepositories(rootPath, { existingPaths });
+        return { root: rootPath, repos, found: repos.length };
+      }
+      if (data.command === 'add-batch') {
+        if (!Array.isArray(data.paths) || !data.paths.length) throw new CommandError('Informe uma lista de caminhos em paths.');
+        const added = [];
+        const errors = [];
+        for (const p of data.paths) {
+          try {
+            const res = await add(p);
+            added.push(res);
+          } catch (err) {
+            errors.push({ path: p, error: err.message });
+          }
+        }
+        return { ok: true, added, errors };
+      }
+      if (data.command === 'worktree-sync') {
+        const repo = config.projects.find(p => p.id === data.id);
+        if (!repo) throw new CommandError('Projeto não encontrado.');
+        if (!data.branch) throw new CommandError('Informe a branch para sincronização via worktree.');
+        return await syncBranchWorktree(repo, data.branch);
+      }
+      if (data.command === 'daily-summary') {
+        const date = data.date || new Date().toISOString().slice(0, 10);
+        const res = await history.dailySummary({ date });
+        return { ok: true, summary: res };
+      }
+      if (data.command === 'p2p-peers') {
+        return { ok: true, peers: p2p?.getPeers() || [] };
       }
       if (data.command === 'clone') {
         if (typeof data.url !== 'string' || !/^https:\/\/github\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+(?:\.git)?\/?$/.test(data.url)) throw new CommandError('Informe uma URL HTTPS de repositório do GitHub, sem credenciais.');
@@ -266,8 +303,13 @@ export async function daemon() {
         const authority = `127.0.0.1:${server.address().port}`;
         if (req.headers.host !== authority || (req.headers.origin && req.headers.origin !== `http://${authority}`)) return json(403, { error: 'Origem inválida.' });
         if (req.method === 'GET' && req.url === '/') {
-          res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Frame-Options': 'DENY', 'Referrer-Policy': 'no-referrer', 'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; frame-ancestors 'none'" });
+          res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Frame-Options': 'DENY', 'Referrer-Policy': 'no-referrer', 'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self'; frame-ancestors 'none'" });
           return res.end(page);
+        }
+        if (req.method === 'GET' && req.url === '/hud.html') {
+          const content = await readFile(fileURLToPath(new URL('../ui/hud.html', import.meta.url)));
+          res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
+          return res.end(content);
         }
         if (req.method === 'GET' && req.url === '/favicon.ico') { res.writeHead(204); return res.end(); }
         if (req.method === 'GET' && ['/assets/local.js', '/assets/local.css'].includes(req.url)) {
@@ -305,11 +347,21 @@ export async function daemon() {
     await new Promise((resolve, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', resolve); });
     const port = server.address().port;
     await write('runtime.json', { port, token, pid: process.pid });
+    try {
+      p2p = new P2PManager({
+        deviceId: config.remote?.deviceId || 'devsync-' + process.pid,
+        name: config.remote?.name || 'DevSync Node',
+        httpPort: port,
+        token
+      });
+      p2p.start();
+    } catch {}
     console.log(`Painel local: http://127.0.0.1:${port}/#${token}`);
     timer = setInterval(() => tick().catch(() => console.error('Não foi possível concluir a verificação ou gravar o histórico.')), 1000);
     async function stop() {
       if (stopping) return; stopping = true;
       clearInterval(timer);
+      try { p2p?.stop(); } catch {}
       await remote.stop();
       server.close();
       await mutations;
@@ -323,7 +375,9 @@ export async function daemon() {
     await tick(); await remote.poll();
     return { port, token, stop: async () => {
       if (stopping) return;
-      stopping = true; clearInterval(timer); await remote.stop();
+      stopping = true; clearInterval(timer);
+      try { p2p?.stop(); } catch {}
+      await remote.stop();
       await new Promise(resolve => server.close(resolve)); await mutations;
       while (busy.size) await new Promise(resolve => setTimeout(resolve, 50));
       process.removeListener('SIGINT', stop); process.removeListener('SIGTERM', stop);

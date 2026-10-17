@@ -2,11 +2,15 @@ import { createHash } from 'node:crypto';
 import { git, gitRaw } from './git.js';
 import { rulesFor, matchesInclude } from './rules.js';
 import { scanDiff } from './secrets.js';
+import { generateConventionalCommit } from './ai.js';
 const quiet = new Map();
 
 export const SENSITIVE_FILE_PATTERN = /(^|[\/\\])(?:\.env(?:\..*)?|\.npmrc|\.pypirc|\.netrc|.*\.(?:pem|key|p12|pfx)|(?:credentials|secrets|tokens)(?:\..*)?|id_(?:rsa|ed25519|ecdsa|dsa)|\.(?:ssh|aws)(?:[\/\\].*)?)$/i;
 
-export function formatCheckpointMessage(files, timestamp = new Date().toISOString()) {
+export function formatCheckpointMessage(files, timestamp = new Date().toISOString(), customSummary) {
+  if (customSummary) {
+    return `${customSummary} [DevSync ${timestamp}]`;
+  }
   const names = files.slice(0, 3).join(', ');
   const extra = files.length > 3 ? ` +${files.length - 3}` : '';
   return `DevSync checkpoint: ${names}${extra} (${timestamp})`;
@@ -33,7 +37,14 @@ export async function checkpoint(repo, status) {
   if (!previous || previous.fingerprint !== fingerprint) quiet.set(repo.path, { fingerprint, since: Date.now() });
   const delay = repo.checkpointDelayMs ?? rulesFor(repo).checkpointDelaySeconds * 1000;
   if (Date.now() - quiet.get(repo.path).since < delay) return false;
-  await git(repo.path, '--literal-pathspecs', 'commit', '--only', '-m', formatCheckpointMessage(files), '--', ...files);
+  let commitMsg = formatCheckpointMessage(files);
+  if (repo.aiCommit) {
+    try {
+      const { message } = await generateConventionalCommit(diffText, { files });
+      if (message) commitMsg = formatCheckpointMessage(files, new Date().toISOString(), message);
+    } catch {}
+  }
+  await git(repo.path, '--literal-pathspecs', 'commit', '--only', '-m', commitMsg, '--', ...files);
   quiet.delete(repo.path);
   return true;
 }

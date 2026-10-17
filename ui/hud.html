@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <title>DevSync HUD</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+    body {
+      background: transparent;
+      overflow: hidden;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .hud-pill {
+      -webkit-app-region: drag;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 6px 14px;
+      border-radius: 24px;
+      background: rgba(13, 21, 38, 0.88);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(155, 202, 255, 0.28);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+      color: #eaf0ff;
+      font-size: 13px;
+      cursor: grab;
+      transition: border-color 0.2s, transform 0.2s;
+    }
+    .hud-pill:active { cursor: grabbing; }
+    .status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #6ee7b7;
+      box-shadow: 0 0 10px #6ee7b7;
+      transition: background 0.3s, box-shadow 0.3s;
+      flex-shrink: 0;
+    }
+    .status-dot.warn { background: #ffd994; box-shadow: 0 0 10px #ffd994; }
+    .status-dot.error { background: #fca5a5; box-shadow: 0 0 10px #fca5a5; }
+    .status-text {
+      font-weight: 600;
+      letter-spacing: -0.3px;
+      white-space: nowrap;
+    }
+    .hud-actions {
+      -webkit-app-region: no-drag;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-left: 4px;
+    }
+    .hud-btn {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 50%;
+      width: 26px;
+      height: 26px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #a8b9d4;
+      cursor: pointer;
+      font-size: 12px;
+      transition: background 0.15s, color 0.15s;
+    }
+    .hud-btn:hover {
+      background: rgba(155, 202, 255, 0.25);
+      color: #fff;
+    }
+  </style>
+</head>
+<body>
+  <div class="hud-pill" id="pill">
+    <div class="status-dot" id="dot"></div>
+    <span class="status-text" id="status-text">DevSync</span>
+    <div class="hud-actions">
+      <button class="hud-btn" id="btn-sync" title="Sincronizar todos (Ctrl+Shift+S)">🔄</button>
+      <button class="hud-btn" id="btn-expand" title="Abrir painel completo (Ctrl+Shift+D)">⤢</button>
+      <button class="hud-btn" id="btn-close" title="Fechar HUD">✕</button>
+    </div>
+  </div>
+
+  <script>
+    const token = location.hash.replace('#', '');
+    const origin = location.origin;
+
+    async function updateStatus() {
+      try {
+        const res = await fetch(`${origin}/api/status`, {
+          headers: { authorization: `Bearer ${token}` }
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        const projects = data.projects || [];
+        const dirtyOrDiverged = projects.filter(p => ['dirty', 'diverged', 'error'].includes(p.state));
+        const dot = document.getElementById('dot');
+        const text = document.getElementById('status-text');
+
+        if (dirtyOrDiverged.length > 0) {
+          dot.className = 'status-dot warn';
+          text.textContent = `${dirtyOrDiverged.length} pendência(s)`;
+        } else {
+          dot.className = 'status-dot';
+          text.textContent = `${projects.length} em dia`;
+        }
+      } catch {}
+    }
+
+    document.getElementById('btn-sync').onclick = async () => {
+      const btn = document.getElementById('btn-sync');
+      btn.style.transform = 'rotate(360deg)';
+      btn.style.transition = 'transform 0.5s';
+      try {
+        await fetch(`${origin}/api/command`, {
+          method: 'POST',
+          headers: { authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ command: 'sync-all' })
+        });
+      } catch {}
+      setTimeout(() => { btn.style.transform = 'none'; btn.style.transition = 'none'; updateStatus(); }, 500);
+    };
+
+    document.getElementById('btn-expand').onclick = () => {
+      if (window.devsyncDesktop?.showMain) window.devsyncDesktop.showMain();
+    };
+
+    document.getElementById('btn-close').onclick = () => {
+      if (window.devsyncDesktop?.closeHud) window.devsyncDesktop.closeHud();
+    };
+
+    updateStatus();
+    setInterval(updateStatus, 3000);
+  </script>
+</body>
+</html>

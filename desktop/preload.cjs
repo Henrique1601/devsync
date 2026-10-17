@@ -7,5 +7,8 @@ contextBridge.exposeInMainWorld('devsyncDesktop', {
   configureUpdates: settings => ipcRenderer.invoke('updates-configure', settings),
   checkUpdates: () => ipcRenderer.invoke('updates-check'),
   downloadUpdate: () => ipcRenderer.invoke('updates-download'),
-  installUpdate: () => ipcRenderer.invoke('updates-install')
+  installUpdate: () => ipcRenderer.invoke('updates-install'),
+  showMain: () => ipcRenderer.invoke('show-main'),
+  closeHud: () => ipcRenderer.invoke('close-hud'),
+  toggleHud: () => ipcRenderer.invoke('toggle-hud')
 });

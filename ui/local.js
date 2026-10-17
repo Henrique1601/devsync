@@ -23,7 +23,7 @@ let view='projects',refreshing=false,historyLoading=false,updateLoading=false,up
 function el(tag,text,css){const n=document.createElement(tag);if(text!==undefined)n.textContent=text;if(css)n.className=css;return n}
 function notice(text){feedback.textContent=text}function time(value){return value?new Date(value).toLocaleString('pt-BR'):'aguardando'}
 async function api(route,body){const r=await fetch('/api/'+route,{method:body?'POST':'GET',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},...(body?{body:JSON.stringify(body)}:{})});const d=await r.json();if(!r.ok)throw Error(d.error||'Não foi possível concluir.');return d}
-function showView(next){view=next;document.querySelectorAll('.view').forEach(n=>n.hidden=n.id!=='view-'+view);document.querySelectorAll('[data-view]').forEach(n=>n.setAttribute('aria-pressed',String(n.dataset.view===view)));if(view==='history')loadHistory();if(view==='metrics')loadMetrics();if(view==='settings')refreshUpdates()}
+function showView(next){view=next;document.querySelectorAll('.view').forEach(n=>n.hidden=n.id!=='view-'+view);document.querySelectorAll('[data-view]').forEach(n=>n.setAttribute('aria-pressed',String(n.dataset.view===view)));if(view==='history')loadHistory();if(view==='metrics')loadMetrics();if(view==='settings'){refreshUpdates();loadP2pPeers()}}
 document.querySelectorAll('[data-view],[data-go]').forEach(b=>b.addEventListener('click',()=>showView(b.dataset.view||b.dataset.go)));
 async function command(cmd,id,extra={}){
   if(cmd==='checkpoint-on'&&!confirm('Criar commits automáticos dos arquivos permitidos? Confira suas regras e o .gitignore. O envio é ativado separadamente.'))return;
@@ -263,4 +263,81 @@ async function refreshUpdates(){if(!window.devsyncDesktop?.updateState||updateLo
 if(window.devsyncDesktop){$('#browse').hidden=false;$('#desktop-settings').hidden=false;$('#browse').addEventListener('click',async()=>{try{const p=await window.devsyncDesktop.chooseFolder();if(p){$('#folder').value=p;$('#diagnostics').replaceChildren()}}catch(e){notice(e.message)}});window.devsyncDesktop.startupEnabled().then(v=>$('#startup').checked=v).catch(e=>notice(e.message));$('#startup').addEventListener('change',async e=>{try{e.target.checked=await window.devsyncDesktop.setStartup(e.target.checked)}catch(error){e.target.checked=!e.target.checked;notice(error.message)}});
   $('#updates').addEventListener('submit',async e=>{e.preventDefault();const button=e.currentTarget.querySelector('button');button.disabled=true;try{const requested={enabled:$('#update-enabled').checked,feedUrl:$('#update-feed').value.trim()};const saved=await window.devsyncDesktop.configureUpdates(requested);$('#update-enabled').checked=saved.enabled;$('#update-feed').value=saved.feedUrl||'';notice(saved.enabled===requested.enabled&&(!requested.feedUrl||saved.feedUrl===new URL(requested.feedUrl.endsWith('/')?requested.feedUrl:requested.feedUrl+'/').href)?'Preferência de atualização salva.':'Fonte não alterada.');await refreshUpdates()}catch(error){notice(error.message)}finally{button.disabled=false}});for(const[selector,action]of [['#update-check','checkUpdates'],['#update-download','downloadUpdate'],['#update-install','installUpdate']])$(selector).addEventListener('click',async()=>{const button=$(selector);button.disabled=true;try{await window.devsyncDesktop[action]();await refreshUpdates()}catch(e){notice(e.message)}finally{button.disabled=false}});refreshUpdates();setInterval(()=>{if(view==='settings')refreshUpdates()},1500);
 }
+$('#history-daily')?.addEventListener('click',async()=>{
+  const b=$('#history-daily');b.disabled=true;notice('Gerando diário no Obsidian…');
+  try{
+    const res=await api('command',{command:'daily-summary',projectId:$('#history-project').value||undefined});
+    notice(res.message||'Diário gerado no Obsidian com sucesso!');
+  }catch(e){notice(e.message)}finally{b.disabled=false}
+});
+$('#scout-scan')?.addEventListener('click',async()=>{
+  const b=$('#scout-scan'),host=$('#scout-results');b.disabled=true;
+  host.replaceChildren(el('p','Buscando repositórios Git no computador…'));
+  try{
+    const root=$('#scout-root').value.trim()||undefined;
+    const res=await api('command',{command:'scout',rootDir:root});
+    host.replaceChildren();
+    if(!res.repositories?.length){
+      host.append(el('p','Nenhum repositório Git encontrado nesta pasta.','empty'));
+      return;
+    }
+    const countBox=el('div',undefined,'row');
+    countBox.append(el('strong',`Encontrados: ${res.count} repositório(s) (${res.registered} já cadastrados)`));
+    const actionsBar=el('div',undefined,'actions');
+    const addAllBtn=el('button','Cadastrar Não Cadastrados em Lote','primary');
+    addAllBtn.type='button';
+    const unregistered=res.repositories.filter(r=>!r.alreadyRegistered);
+    addAllBtn.disabled=unregistered.length===0;
+    addAllBtn.onclick=async()=>{
+      addAllBtn.disabled=true;notice('Cadastrando repositórios em lote…');
+      try{
+        const batchRes=await api('command',{command:'add-batch',paths:unregistered.map(r=>r.path)});
+        notice(`Cadastrados ${batchRes.addedCount} novos projetos no DevSync!`);
+        await refresh();showView('projects');
+      }catch(err){notice(err.message)}finally{addAllBtn.disabled=false}
+    };
+    actionsBar.append(addAllBtn);host.append(countBox,actionsBar);
+    for(const r of res.repositories){
+      const item=el('div',undefined,'scout-item');
+      const meta=el('div',undefined,'scout-meta');
+      meta.append(el('strong',r.name),el('code',r.path),el('span',`Branch: ${r.branch||'desconhecida'} · Remoto: ${r.remoteUrl||'nenhum'} · ${r.isDirty?'Alterações locais pendentes':'Limpo'}`));
+      const right=el('div',undefined,'scout-actions');
+      if(r.alreadyRegistered){
+        right.append(el('span','✓ Cadastrado','badge'));
+      }else{
+        const singleAdd=el('button','Cadastrar');singleAdd.type='button';
+        singleAdd.onclick=async()=>{
+          singleAdd.disabled=true;
+          try{
+            await api('command',{command:'add',path:r.path});
+            notice(`Projeto ${r.name} cadastrado.`);
+            singleAdd.replaceWith(el('span','✓ Cadastrado','badge'));
+            await refresh();
+          }catch(err){notice(err.message);singleAdd.disabled=false}
+        };
+        right.append(singleAdd);
+      }
+      item.append(meta,right);host.append(item);
+    }
+  }catch(e){host.replaceChildren(el('p','Erro na busca: '+e.message,'hint'))}finally{b.disabled=false}
+});
+$('#btn-toggle-hud')?.addEventListener('click',()=>{
+  if(window.devsyncDesktop?.toggleHud){window.devsyncDesktop.toggleHud();notice('HUD Flutuante alternado.')}
+  else{notice('O HUD Flutuante está disponível no aplicativo Desktop Electron.')}
+});
+async function loadP2pPeers(){
+  const host=$('#p2p-peers-list');if(!host)return;
+  try{
+    const res=await api('command',{command:'p2p-peers'});host.replaceChildren();
+    if(!res.peers?.length){host.append(el('p','Nenhum outro computador DevSync detectado na rede local no momento.','empty'));return}
+    for(const p of res.peers){
+      const c=el('div',undefined,'p2p-peer-card');
+      c.append(el('strong',p.device||p.address));
+      c.append(el('span',`${p.address}:${p.port||48123} · Visto: ${time(p.lastSeen)}`,'hint'));
+      host.append(c);
+    }
+  }catch(e){host.replaceChildren(el('p','P2P: '+e.message,'hint'))}
+}
+$('#p2p-refresh')?.addEventListener('click',loadP2pPeers);
 refresh();setInterval(refresh,5000);setInterval(()=>{if(view==='history')loadHistory();if(view==='metrics')loadMetrics()},10000);
+
