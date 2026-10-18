@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { mkdir, readFile, writeFile, rename } from 'node:fs/promises';
+import { mkdir, readFile, writeFile, rename, open } from 'node:fs/promises';
 import path from 'node:path';
 import { home } from './store.js';
 
@@ -19,8 +19,21 @@ export function historySnapshot(status = {}) {
 export async function createHistory({ directory = home, maxEntries = 1000 } = {}) {
   const filename = path.join(directory, 'history.json');
   let entries;
-  try { entries = JSON.parse(await readFile(filename, 'utf8')); if (!Array.isArray(entries)) throw new Error('Histórico inválido.'); }
-  catch (error) { if (error.code !== 'ENOENT') throw error; entries = []; }
+  try {
+    const raw = await readFile(filename, 'utf8');
+    if (!raw.trim() || raw.includes('\0')) throw new SyntaxError('Histórico vazio ou preenchido com bytes nulos.');
+    entries = JSON.parse(raw);
+    if (!Array.isArray(entries)) throw new Error('Histórico inválido.');
+  }
+  catch (error) {
+    if (error.code !== 'ENOENT') {
+      try {
+        const backupName = `${filename}.corrupt-${Date.now()}.bak`;
+        await rename(filename, backupName);
+      } catch {}
+    }
+    entries = [];
+  }
   entries = entries.slice(-maxEntries);
   let pending = Promise.resolve();
   return {
@@ -34,7 +47,14 @@ export async function createHistory({ directory = home, maxEntries = 1000 } = {}
         const updated = [...entries, entry].slice(-maxEntries);
         await mkdir(directory, { recursive: true, mode: 0o700 });
         const temporary = `${filename}.${process.pid}.tmp`;
-        await writeFile(temporary, JSON.stringify(updated), { mode: 0o600 }); await rename(temporary, filename);
+        const handle = await open(temporary, 'w', 0o600);
+        try {
+          await handle.writeFile(JSON.stringify(updated), 'utf8');
+          await handle.sync();
+        } finally {
+          await handle.close();
+        }
+        await rename(temporary, filename);
         entries = updated;
         return entry;
       });

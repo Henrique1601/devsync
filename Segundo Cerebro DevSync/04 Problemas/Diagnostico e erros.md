@@ -32,6 +32,25 @@ O serviço recupera automaticamente locks quando comprova que o dono encerrou. L
 
 Se persistir, registre versão, horário e mensagem; investigue a instância dona antes de qualquer limpeza manual.
 
+## Arquivo de Histórico ou JSON Corrompido / Bytes Nulos
+
+**Sinal:** “Não foi possível iniciar o DevSync — Unexpected token ' '” ou “Unexpected token ... is not valid JSON”.
+
+**Causa:** Reinicialização forçada do computador, queda de energia ou encerramento inesperado do processo durante escrita em disco NTFS no Windows, deixando o arquivo `~/.devsync/history.json` ou `config.json` preenchido com bytes nulos (`\0`) ou truncado.
+
+**Resolução & Auto-Cura:**
+1. O DevSync possui mecanismo nativo de auto-cura: ao detectar bytes nulos (`\0`) ou JSON sintaticamente inválido, o arquivo defeituoso é automaticamente colocado em quarentena renomeado para `history.json.corrupt-<timestamp>.bak` e o sistema inicializa um histórico limpo sem travar o aplicativo.
+2. As escritas do DevSync utilizam sincronização física em disco (`handle.sync()`) antes do rename atômico para blindar o sistema de arquivos contra preenchimento de clusters vazios pelo Windows.
+3. Caso precise recuperar manualmente no terminal:
+```powershell
+# Verificar se o arquivo está preenchido com nulos
+node -e "const fs = require('fs'); console.log(fs.readFileSync(process.env.USERPROFILE + '/.devsync/history.json'))"
+
+# Resetar o histórico mantendo backup
+Copy-Item "$env:USERPROFILE\.devsync\history.json" "$env:USERPROFILE\.devsync\history.json.bak"
+Set-Content -Path "$env:USERPROFILE\.devsync\history.json" -Value "[]" -Encoding UTF8
+```
+
 ## Pasta, Git, commits ou upstream ausentes
 
 Abra **Configurar projeto → Verificar configuração**. No terminal da pasta, os comandos abaixo são de inspeção:

@@ -65,8 +65,10 @@ else {
     try {
       try {
         const existing = await read('runtime.json');
-        const response = await fetch(`http://127.0.0.1:${existing.port}/api/status`, { headers:{authorization:`Bearer ${existing.token}`}, signal:AbortSignal.timeout(2000) });
-        if (response.ok) runtime = existing;
+        if (existing && existing.port && existing.token) {
+          const response = await fetch(`http://127.0.0.1:${existing.port}/api/status`, { headers:{authorization:`Bearer ${existing.token}`}, signal:AbortSignal.timeout(2000) });
+          if (response.ok) runtime = existing;
+        }
       } catch {}
       if (!runtime) {
         const { daemon } = await import(pathToFileURL(path.join(__dirname,'../src/daemon.js')).href);
@@ -148,7 +150,10 @@ else {
       pollTimer=setInterval(async()=>{if(checking)return;checking=true;try{const r=await fetch(`http://127.0.0.1:${runtime.port}/api/status`,{headers:{authorization:`Bearer ${runtime.token}`},signal:AbortSignal.timeout(5000)});if(!r.ok)return;const {projects}=await r.json();for(const p of projects){const previous=last.get(p.id);last.set(p.id,p.state);if(previous&&previous!==p.state&&['error','dirty','diverged','synced'].includes(p.state)&&Notification.isSupported())new Notification({title:'DevSync: '+p.name,body:p.state==='synced'?'Projeto sincronizado.':'O projeto precisa de atenção. Abra o DevSync para ver os detalhes.'}).show()}}catch{}finally{checking=false}},10000);
       if (!process.argv.includes('--background')) await show();
       if (smoke) setTimeout(() => { const passed = bridgeReady && updateBridgeReady; console.log(JSON.stringify({ desktopSmoke: passed ? 'passed' : 'failed', tray: !tray.isDestroyed(), ownedService: Boolean(service), updateBridge: updateBridgeReady, updatesSupported: supportedUpdates })); if(!passed)process.exitCode=1;app.quit(); }, 2000);
-    } catch (error) { dialog.showErrorBox('Não foi possível iniciar o DevSync',error.message);app.quit(); }
+    } catch (error) {
+      dialog.showErrorBox('Não foi possível iniciar o DevSync', error.message + '\n\nSe necessário, verifique os arquivos em %USERPROFILE%\\.devsync');
+      app.quit();
+    }
   });
   app.on('before-quit', event => { if (quitting) return;event.preventDefault();quitting=true;stopOnce().finally(()=>{tray?.destroy();app.quit()}); });
 }

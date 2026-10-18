@@ -86,4 +86,61 @@ test('catchUpSummary injects and updates morning catch-up section in Obsidian da
   assert.equal(occurrences, 1);
 });
 
+test('createHistory recovers cleanly from null bytes and corrupted JSON files', async t => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), 'devsync-history-corrupt-'));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+
+  // Simulate NTFS zero-byte cluster corruption (file filled with \0)
+  const historyPath = path.join(directory, 'history.json');
+  const { writeFile, readdir } = await import('node:fs/promises');
+  await writeFile(historyPath, Buffer.alloc(1024, 0)); // 1024 null bytes
+
+  // Should NOT throw! Should quarantine corrupt file and start cleanly with []
+  const history = await createHistory({ directory });
+  assert.equal(history.query().total, 0);
+
+  // A backup file .corrupt-... should have been preserved
+  const files = await readdir(directory);
+  assert.ok(files.some(f => f.includes('.corrupt-') && f.endsWith('.bak')));
+
+  // Now appending works normally and writes valid JSON
+  await history.append({
+    projectId: 'p1',
+    projectName: 'Recovery Test',
+    startedAt: new Date().toISOString(),
+    finishedAt: new Date().toISOString(),
+    action: 'sync',
+    state: 'synced',
+    reason: 'Recuperado com sucesso.'
+  });
+  assert.equal(history.query().total, 1);
+});
+
+test('store read recovers cleanly from corrupted JSON and returns fallback when provided', async t => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), 'devsync-store-corrupt-'));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+
+  const originalHome = process.env.DEVSYNC_HOME;
+  process.env.DEVSYNC_HOME = directory;
+  t.after(() => { process.env.DEVSYNC_HOME = originalHome; });
+
+  const { read, write } = await import(`../src/store.js?t=${Date.now()}`);
+
+  // Normal write and read
+  await write('test.json', { a: 1 });
+  const val = await read('test.json');
+  assert.deepEqual(val, { a: 1 });
+
+  // Corrupt the file with invalid syntax
+  const { writeFile, readdir } = await import('node:fs/promises');
+  await writeFile(path.join(directory, 'test.json'), 'Unexpected token error { invalid json');
+
+  // Reading with fallback should NOT throw, should return fallback and quarantine corrupted file
+  const fallbackVal = await read('test.json', { fallback: true });
+  assert.deepEqual(fallbackVal, { fallback: true });
+
+  const files = await readdir(directory);
+  assert.ok(files.some(f => f.startsWith('test.json.corrupt-')));
+});
+
 
