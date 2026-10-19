@@ -11,6 +11,16 @@ const IGNORED_DIRS = new Set([
 export async function inspectScoutedRepo(repoPath, existingPaths = new Set()) {
   const norm = path.resolve(repoPath).toLowerCase();
   const name = path.basename(repoPath);
+
+  let isWorkTree = false;
+  try {
+    const raw = await gitRaw(repoPath, 'rev-parse', '--is-inside-work-tree');
+    isWorkTree = raw.trim() === 'true';
+  } catch {}
+  if (!isWorkTree) {
+    throw new Error('A pasta não pertence a um repositório Git.');
+  }
+
   let branch = 'main';
   let remoteUrl = null;
   let dirtyCount = 0;

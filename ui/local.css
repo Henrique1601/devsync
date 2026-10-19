@@ -15,11 +15,17 @@ dialog.modal-large{width:min(1100px,96vw);max-height:90vh}
 .secret-item{padding:12px 14px;background:rgba(252,165,165,.08);border:1px solid var(--danger);border-radius:8px;margin-bottom:8px}
 .secret-safe{padding:16px;background:rgba(110,231,183,.08);border:1px solid var(--ok);border-radius:8px;color:var(--ok)}
 .scout-results-container{margin-top:16px;display:flex;flex-direction:column;gap:8px}
-.scout-item{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 16px;background:var(--input-bg);border:1px solid var(--line);border-radius:10px}
+.scout-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 16px;background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:10px;margin-bottom:4px;flex-wrap:wrap}
+.scout-toolbar label{display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;margin:0;user-select:none}
+.scout-item{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 16px;background:var(--input-bg);border:1px solid var(--line);border-radius:10px;transition:border-color .15s ease, background .15s ease}
+.scout-item.selected{border-color:var(--focus);background:rgba(96,165,250,.07)}
+.scout-check{width:18px;height:18px;cursor:pointer;accent-color:var(--focus);flex-shrink:0}
 .scout-meta{display:flex;flex-direction:column;gap:4px;min-width:0;flex:1}
 .scout-meta strong{font-size:14px;overflow-wrap:anywhere}
+.scout-meta code{font-size:11px;color:var(--muted);background:rgba(0,0,0,.2);padding:2px 6px;border-radius:4px;overflow-wrap:anywhere}
 .scout-meta span{font-size:12px;color:var(--muted)}
-.scout-actions{display:flex;align-items:center;gap:8px}
+.scout-actions{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.batch-input-area{width:100%;min-height:120px;font-family:monospace;font-size:13px;padding:10px;background:var(--input-bg);color:var(--text);border:1px solid var(--line);border-radius:8px;resize:vertical}
 .p2p-peer-card{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--input-bg);border:1px solid var(--line);border-radius:8px;margin-bottom:8px}
 @media(max-width:860px){.merge-grid{grid-template-columns:1fr}}
 @media(max-width:640px){body{padding:24px 16px}.badge{display:none}nav{gap:6px}nav button{padding:10px;font-size:13px}.grid{grid-template-columns:1fr}.row{flex-wrap:wrap}.row input{flex-basis:100%}section,.history-entry{padding:18px}.actions button{flex:1 1 auto}h2{font-size:22px}}

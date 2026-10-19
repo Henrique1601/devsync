@@ -1,6 +1,7 @@
 const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('devsyncDesktop', {
   chooseFolder: () => ipcRenderer.invoke('choose-folder'),
+  chooseFolders: () => ipcRenderer.invoke('choose-folders'),
   startupEnabled: () => ipcRenderer.invoke('startup-get'),
   setStartup: enabled => ipcRenderer.invoke('startup-set', enabled),
   updateState: () => ipcRenderer.invoke('updates-get'),

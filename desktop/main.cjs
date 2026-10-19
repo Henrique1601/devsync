@@ -75,6 +75,7 @@ else {
         service = await daemon(); runtime = service;
       }
       ipcMain.handle('choose-folder', async event => { if (!trusted(event)) throw Error('Origem inválida.');const result=await dialog.showOpenDialog(window,{properties:['openDirectory']});return result.canceled?null:result.filePaths[0]; });
+      ipcMain.handle('choose-folders', async event => { if (!trusted(event)) throw Error('Origem inválida.');const result=await dialog.showOpenDialog(window,{properties:['openDirectory','multiSelections'],title:'Selecione uma ou mais pastas de projetos Git'});return result.canceled?[]:result.filePaths; });
       ipcMain.handle('startup-get', event => { if(!trusted(event))throw Error('Origem inválida.');bridgeReady=true;return app.getLoginItemSettings({path:process.execPath,args:startupArgs}).openAtLogin; });
       ipcMain.handle('startup-set', (event, enabled) => { if(!trusted(event)||typeof enabled!=='boolean')throw Error('Pedido inválido.');app.setLoginItemSettings({openAtLogin:enabled,path:process.execPath,args:startupArgs});return app.getLoginItemSettings({path:process.execPath,args:startupArgs}).openAtLogin; });
       ipcMain.handle('show-main', () => show());

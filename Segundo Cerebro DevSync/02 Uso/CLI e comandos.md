@@ -39,6 +39,8 @@ node src/cli.js metrics
 node src/cli.js dashboard
 node src/cli.js diagnose "C:/Projetos/meu-crm"
 node src/cli.js add "C:/Projetos/meu-crm"
+node src/cli.js add-batch "C:/Projetos/app1" "C:/Projetos/app2"
+node src/cli.js import "C:/Users/henri/Programacao"
 node src/cli.js clone "https://github.com/usuario/projeto.git" "C:/Projetos/nova-pasta"
 node src/cli.js history ID_DO_PROJETO 100
 ```

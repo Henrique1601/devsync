@@ -260,7 +260,9 @@ $('#webhook')?.addEventListener('submit',async e=>{
 $('#test-webhook')?.addEventListener('click',async()=>{const b=$('#test-webhook');b.disabled=true;try{notice('Enviando notificação de teste…');await api('command',{command:'webhook-test'});notice('Notificação de teste entregue!')}catch(e){notice(e.message)}finally{b.disabled=false}});
 $('#disconnect-webhook')?.addEventListener('click',()=>command('webhook-off'));
 async function refreshUpdates(){if(!window.devsyncDesktop?.updateState||updateLoading)return;updateLoading=true;try{const s=await window.devsyncDesktop.updateState();$('#version').textContent=s.currentVersion||'0.5';$('#update-state').textContent=s.message||s.status;$('#update-controls').hidden=!s.supported;if(!updatesInitialized){$('#update-enabled').checked=s.enabled;$('#update-feed').value=s.feedUrl||'';updatesInitialized=true}$('#update-download').hidden=s.status!=='available';$('#update-install').hidden=s.status!=='downloaded';$('#update-check').disabled=!s.enabled||['checking','downloading','installing'].includes(s.status);$('#update-progress').hidden=s.status!=='downloading';$('#update-progress').value=typeof s.progress==='number'?s.progress:s.progress?.percent||0}catch(e){notice(e.message)}finally{updateLoading=false}}
-if(window.devsyncDesktop){$('#browse').hidden=false;$('#desktop-settings').hidden=false;$('#browse').addEventListener('click',async()=>{try{const p=await window.devsyncDesktop.chooseFolder();if(p){$('#folder').value=p;$('#diagnostics').replaceChildren()}}catch(e){notice(e.message)}});window.devsyncDesktop.startupEnabled().then(v=>$('#startup').checked=v).catch(e=>notice(e.message));$('#startup').addEventListener('change',async e=>{try{e.target.checked=await window.devsyncDesktop.setStartup(e.target.checked)}catch(error){e.target.checked=!e.target.checked;notice(error.message)}});
+if(window.devsyncDesktop){$('#browse').hidden=false;$('#desktop-settings').hidden=false;$('#browse').addEventListener('click',async()=>{try{const p=await window.devsyncDesktop.chooseFolder();if(p){$('#folder').value=p;$('#diagnostics').replaceChildren()}}catch(e){notice(e.message)}});
+  const sBrowse=$('#scout-browse-root');if(sBrowse){sBrowse.hidden=false;sBrowse.addEventListener('click',async()=>{try{const p=await window.devsyncDesktop.chooseFolder();if(p){$('#scout-root').value=p;$('#scout-scan').click()}}catch(e){notice(e.message)}})}
+  window.devsyncDesktop.startupEnabled().then(v=>$('#startup').checked=v).catch(e=>notice(e.message));$('#startup').addEventListener('change',async e=>{try{e.target.checked=await window.devsyncDesktop.setStartup(e.target.checked)}catch(error){e.target.checked=!e.target.checked;notice(error.message)}});
   $('#updates').addEventListener('submit',async e=>{e.preventDefault();const button=e.currentTarget.querySelector('button');button.disabled=true;try{const requested={enabled:$('#update-enabled').checked,feedUrl:$('#update-feed').value.trim()};const saved=await window.devsyncDesktop.configureUpdates(requested);$('#update-enabled').checked=saved.enabled;$('#update-feed').value=saved.feedUrl||'';notice(saved.enabled===requested.enabled&&(!requested.feedUrl||saved.feedUrl===new URL(requested.feedUrl.endsWith('/')?requested.feedUrl:requested.feedUrl+'/').href)?'Preferência de atualização salva.':'Fonte não alterada.');await refreshUpdates()}catch(error){notice(error.message)}finally{button.disabled=false}});for(const[selector,action]of [['#update-check','checkUpdates'],['#update-download','downloadUpdate'],['#update-install','installUpdate']])$(selector).addEventListener('click',async()=>{const button=$(selector);button.disabled=true;try{await window.devsyncDesktop[action]();await refreshUpdates()}catch(e){notice(e.message)}finally{button.disabled=false}});refreshUpdates();setInterval(()=>{if(view==='settings')refreshUpdates()},1500);
 }
 async function openCatchUp(projectId){
@@ -309,56 +311,192 @@ $('#history-daily')?.addEventListener('click',async()=>{
     notice(res.message||'Diário gerado no Obsidian com sucesso!');
   }catch(e){notice(e.message)}finally{b.disabled=false}
 });
-$('#scout-scan')?.addEventListener('click',async()=>{
-  const b=$('#scout-scan'),host=$('#scout-results');b.disabled=true;
-  host.replaceChildren(el('p','Buscando repositórios Git no computador…'));
-  try{
-    const root=$('#scout-root').value.trim()||undefined;
-    const res=await api('command',{command:'scout',rootDir:root});
+async function scoutAndRender(params = {}) {
+  const host = $('#scout-results');
+  if (!host) return;
+  host.replaceChildren(el('p', 'Analisando pastas e descobrindo repositórios Git…'));
+  try {
+    const res = await api('command', { command: 'scout', ...params });
     host.replaceChildren();
-    if(!res.repositories?.length){
-      host.append(el('p','Nenhum repositório Git encontrado nesta pasta.','empty'));
+    const repos = res.repositories || res.repos || [];
+    if (!repos.length) {
+      host.append(el('p', 'Nenhum repositório Git encontrado.', 'empty'));
       return;
     }
-    const countBox=el('div',undefined,'row');
-    countBox.append(el('strong',`Encontrados: ${res.count} repositório(s) (${res.registered} já cadastrados)`));
-    const actionsBar=el('div',undefined,'actions');
-    const addAllBtn=el('button','Cadastrar Não Cadastrados em Lote','primary');
-    addAllBtn.type='button';
-    const unregistered=res.repositories.filter(r=>!r.alreadyRegistered);
-    addAllBtn.disabled=unregistered.length===0;
-    addAllBtn.onclick=async()=>{
-      addAllBtn.disabled=true;notice('Cadastrando repositórios em lote…');
-      try{
-        const batchRes=await api('command',{command:'add-batch',paths:unregistered.map(r=>r.path)});
-        notice(`Cadastrados ${batchRes.addedCount} novos projetos no DevSync!`);
-        await refresh();showView('projects');
-      }catch(err){notice(err.message)}finally{addAllBtn.disabled=false}
-    };
-    actionsBar.append(addAllBtn);host.append(countBox,actionsBar);
-    for(const r of res.repositories){
-      const item=el('div',undefined,'scout-item');
-      const meta=el('div',undefined,'scout-meta');
-      meta.append(el('strong',r.name),el('code',r.path),el('span',`Branch: ${r.branch||'desconhecida'} · Remoto: ${r.remoteUrl||'nenhum'} · ${r.isDirty?'Alterações locais pendentes':'Limpo'}`));
-      const right=el('div',undefined,'scout-actions');
-      if(r.alreadyRegistered){
-        right.append(el('span','✓ Cadastrado','badge'));
-      }else{
-        const singleAdd=el('button','Cadastrar');singleAdd.type='button';
-        singleAdd.onclick=async()=>{
-          singleAdd.disabled=true;
-          try{
-            await api('command',{command:'add',path:r.path});
-            notice(`Projeto ${r.name} cadastrado.`);
-            singleAdd.replaceWith(el('span','✓ Cadastrado','badge'));
+    const unregistered = repos.filter(r => !r.alreadyRegistered && r.hasGit !== false);
+    const toolbar = el('div', undefined, 'scout-toolbar');
+    const selectAllLabel = el('label');
+    const selectAllCheck = el('input');
+    selectAllCheck.type = 'checkbox';
+    selectAllCheck.className = 'scout-check';
+    selectAllCheck.checked = unregistered.length > 0;
+    selectAllCheck.disabled = unregistered.length === 0;
+    selectAllLabel.append(selectAllCheck, el('span', `Selecionar todos (${unregistered.length} novos de ${repos.length})`));
+
+    const addSelectedBtn = el('button', `📥 Importar Selecionados (${unregistered.length})`, 'primary');
+    addSelectedBtn.type = 'button';
+    addSelectedBtn.disabled = unregistered.length === 0;
+
+    toolbar.append(selectAllLabel, addSelectedBtn);
+    host.append(toolbar);
+
+    const itemMap = new Map();
+    for (const r of repos) {
+      const item = el('div', undefined, 'scout-item');
+      const isUnregistered = !r.alreadyRegistered && r.hasGit !== false;
+      if (isUnregistered) item.classList.add('selected');
+
+      const check = el('input');
+      check.type = 'checkbox';
+      check.className = 'scout-check';
+      check.checked = isUnregistered;
+      check.disabled = !isUnregistered;
+
+      const meta = el('div', undefined, 'scout-meta');
+      meta.append(
+        el('strong', r.name),
+        el('code', r.path),
+        el('span', r.hasGit === false ? '⚠️ Pasta não é um repositório Git' : `Branch: ${r.branch || 'desconhecida'} · Remoto: ${r.remoteUrl || 'nenhum'} · ${r.isDirty ? 'Alterações locais pendentes' : 'Limpo'}`)
+      );
+
+      const right = el('div', undefined, 'scout-actions');
+      if (r.alreadyRegistered) {
+        right.append(el('span', '✓ Já cadastrado', 'badge'));
+      } else if (r.hasGit === false) {
+        right.append(el('span', 'Sem Git', 'badge'));
+      } else {
+        const singleAdd = el('button', 'Cadastrar');
+        singleAdd.type = 'button';
+        singleAdd.onclick = async () => {
+          singleAdd.disabled = true;
+          try {
+            await api('command', { command: 'add', path: r.path });
+            notice(`Projeto ${r.name} cadastrado com sucesso!`);
+            singleAdd.replaceWith(el('span', '✓ Já cadastrado', 'badge'));
+            check.disabled = true;
+            check.checked = false;
+            updateSelection();
             await refresh();
-          }catch(err){notice(err.message);singleAdd.disabled=false}
+          } catch (err) { notice(err.message); singleAdd.disabled = false; }
         };
         right.append(singleAdd);
       }
-      item.append(meta,right);host.append(item);
+
+      check.addEventListener('change', () => {
+        item.classList.toggle('selected', check.checked);
+        updateSelection();
+      });
+
+      item.append(check, meta, right);
+      host.append(item);
+      itemMap.set(r.path, { r, check, item });
     }
-  }catch(e){host.replaceChildren(el('p','Erro na busca: '+e.message,'hint'))}finally{b.disabled=false}
+
+    function updateSelection() {
+      const selected = Array.from(itemMap.values()).filter(({ check }) => check.checked && !check.disabled);
+      addSelectedBtn.disabled = selected.length === 0;
+      addSelectedBtn.textContent = `📥 Importar Selecionados (${selected.length})`;
+      const enabled = Array.from(itemMap.values()).filter(({ check }) => !check.disabled);
+      selectAllCheck.checked = enabled.length > 0 && selected.length === enabled.length;
+    }
+
+    selectAllCheck.addEventListener('change', () => {
+      for (const { check, item } of itemMap.values()) {
+        if (!check.disabled) {
+          check.checked = selectAllCheck.checked;
+          item.classList.toggle('selected', check.checked);
+        }
+      }
+      updateSelection();
+    });
+
+    addSelectedBtn.onclick = async () => {
+      const selectedPaths = Array.from(itemMap.values())
+        .filter(({ check }) => check.checked && !check.disabled)
+        .map(({ r }) => r.path);
+      if (!selectedPaths.length) return;
+      addSelectedBtn.disabled = true;
+      notice(`Cadastrando ${selectedPaths.length} projetos em lote…`);
+      try {
+        const batchRes = await api('command', { command: 'add-batch', paths: selectedPaths });
+        const count = batchRes.addedCount || batchRes.added?.length || 0;
+        let msg = `${count} projeto(s) cadastrado(s) com sucesso!`;
+        if (batchRes.errors?.length) {
+          msg += ` (${batchRes.errors.length} falhas: ${batchRes.errors.map(e => e.error).join(', ')})`;
+        }
+        notice(msg);
+        await refresh();
+        showView('projects');
+      } catch (err) {
+        notice(err.message);
+        addSelectedBtn.disabled = false;
+      }
+    };
+  } catch (e) {
+    host.replaceChildren(el('p', 'Erro na busca: ' + e.message, 'hint'));
+  }
+}
+
+$('#scout-scan')?.addEventListener('click', async () => {
+  const b = $('#scout-scan');
+  b.disabled = true;
+  try {
+    const root = $('#scout-root').value.trim() || undefined;
+    await scoutAndRender({ rootDir: root });
+  } finally {
+    b.disabled = false;
+  }
+});
+
+function openBatchInputModal() {
+  const modal = $('#batch-modal'), body = $('#batch-body');
+  if (!modal || !body) return;
+  body.replaceChildren();
+  const form = el('form');
+  form.append(
+    el('p', 'Cole os caminhos absolutos das pastas dos projetos Git que você deseja importar (um por linha):'),
+    el('textarea', undefined, 'batch-input-area')
+  );
+  const ta = form.querySelector('textarea');
+  ta.placeholder = 'C:\\Programacao\\meu-projeto-1\nC:\\Programacao\\meu-projeto-2\nD:\\Trabalho\\api-backend';
+  ta.required = true;
+
+  const actions = el('div', undefined, 'actions');
+  const cancelBtn = el('button', 'Cancelar');
+  cancelBtn.type = 'button';
+  cancelBtn.onclick = () => (modal.close ? modal.close() : modal.setAttribute('hidden', ''));
+  const submitBtn = el('button', 'Verificar e Importar', 'primary');
+  submitBtn.type = 'submit';
+  actions.append(cancelBtn, submitBtn);
+  form.append(actions);
+
+  form.onsubmit = async e => {
+    e.preventDefault();
+    const lines = ta.value.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+    if (!lines.length) return;
+    if (modal.close) modal.close(); else modal.setAttribute('hidden', '');
+    await scoutAndRender({ paths: lines });
+  };
+
+  body.append(form);
+  if (typeof modal.showModal === 'function') modal.showModal(); else modal.removeAttribute('hidden');
+}
+
+$('#scout-browse-multiple')?.addEventListener('click', async () => {
+  if (window.devsyncDesktop?.chooseFolders) {
+    try {
+      const paths = await window.devsyncDesktop.chooseFolders();
+      if (!paths || !paths.length) return;
+      await scoutAndRender({ paths });
+    } catch (e) { notice(e.message); }
+  } else {
+    openBatchInputModal();
+  }
+});
+
+$('#batch-close')?.addEventListener('click', () => {
+  const m = $('#batch-modal');
+  if (typeof m?.close === 'function') m.close(); else m?.setAttribute('hidden', '');
 });
 $('#btn-toggle-hud')?.addEventListener('click',()=>{
   if(window.devsyncDesktop?.toggleHud){window.devsyncDesktop.toggleHud();notice('HUD Flutuante alternado.')}

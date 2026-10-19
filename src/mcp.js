@@ -184,6 +184,22 @@ export const MCP_TOOLS = [
       },
       additionalProperties: false
     }
+  },
+  {
+    name: 'devsync_add_batch',
+    description: 'Cadastra múltiplos repositórios Git de uma só vez no DevSync informando uma lista de caminhos absolutos.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        paths: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Lista de caminhos absolutos das pastas dos projetos Git a cadastrar.'
+        }
+      },
+      required: ['paths'],
+      additionalProperties: false
+    }
   }
 ];
 
@@ -253,6 +269,9 @@ export async function executeMcpTool(name, args = {}, { callDaemon = defaultDaem
       return callDaemon('command', { command: 'p2p-peers' });
     case 'devsync_catch_up':
       return callDaemon('command', { command: 'catch-up', id: args.id ? String(args.id) : undefined, date: args.date ? String(args.date) : undefined });
+    case 'devsync_add_batch':
+      if (!Array.isArray(args.paths) || !args.paths.length) throw new Error('Informe uma lista de caminhos em paths.');
+      return callDaemon('command', { command: 'add-batch', paths: args.paths.map(String) });
     default:
       throw new Error(`Ferramenta MCP desconhecida: ${name}`);
   }

@@ -20,6 +20,8 @@ try {
   devsync daemon                         Inicia serviço local
   devsync mcp                            Inicia servidor MCP (Model Context Protocol) via stdio
   devsync add <pasta>                     Cadastra clone com upstream
+  devsync add-batch <pastas...>           Cadastra múltiplos projetos em lote
+  devsync import <pasta-raiz>             Varre pasta e cadastra todos os repositórios Git encontrados
   devsync clone <url-github> <nova-pasta>  Clona e cadastra um projeto
   devsync status                         Exibe projetos e conexão remota
   devsync metrics                        Exibe estatísticas de sincronização e tempo economizado
@@ -58,11 +60,36 @@ Checkpoints e envio são optativos e começam desativados.`);
     const runtime = await read('runtime.json');
     const url = `http://127.0.0.1:${runtime.port}`;
     if (command === 'dashboard') console.log(`${url}/#${runtime.token}`);
-    else {
+    else if (command === 'import') {
+      const rootDir = argument || process.cwd();
+      console.log(`Buscando repositórios Git em: ${rootDir}...`);
+      const scoutRes = await fetch(`${url}/api/command`, {
+        method: 'POST', signal: AbortSignal.timeout(180000),
+        headers: { authorization: `Bearer ${runtime.token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ command: 'scout', rootDir })
+      });
+      const scoutData = await scoutRes.json();
+      if (!scoutRes.ok) throw new Error(scoutData.error);
+      const unregistered = (scoutData.repositories || scoutData.repos || []).filter(r => !r.alreadyRegistered && r.hasGit !== false);
+      if (!unregistered.length) {
+        console.log(`Nenhum novo repositório pendente de cadastro encontrado em ${rootDir}. (Total encontrados: ${scoutData.count || 0})`);
+      } else {
+        console.log(`Encontrados ${unregistered.length} novo(s) repositório(s). Cadastrando em lote...`);
+        const batchRes = await fetch(`${url}/api/command`, {
+          method: 'POST', signal: AbortSignal.timeout(180000),
+          headers: { authorization: `Bearer ${runtime.token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ command: 'add-batch', paths: unregistered.map(r => r.path) })
+        });
+        const batchData = await batchRes.json();
+        if (!batchRes.ok) throw new Error(batchData.error);
+        console.log(JSON.stringify(batchData, null, 2));
+      }
+    } else {
       const normalized = command === 'sync' && argument === '--all' ? 'sync-all' : command;
       const readonly = ['status', 'history', 'metrics'].includes(normalized);
       const route = normalized === 'history' ? 'history?' + new URLSearchParams({ ...(argument ? { projectId: argument } : {}), ...(extra ? { limit: extra } : {}) }) : ['status', 'metrics'].includes(normalized) ? normalized : 'command';
       const payload = normalized === 'clone' ? { command: normalized, url: argument, path: extra }
+        : normalized === 'add-batch' ? { command: normalized, paths: [argument, extra, deviceId, name, ...process.argv.slice(7)].filter(Boolean).flatMap(p => p.split(/[,;\n]/)).map(s => s.trim()).filter(Boolean) }
         : normalized === 'remote-config' ? { command: normalized, settings: { url: argument, token: extra, deviceId, name } }
         : normalized === 'check-remote' ? { command: normalized, url: argument }
         : normalized === 'webhook-config' ? { command: normalized, settings: { url: argument, service: extra, chatId: deviceId } }

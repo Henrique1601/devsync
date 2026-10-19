@@ -33,6 +33,7 @@ test('MCP server handles initialize, ping and tools/list', async () => {
   assert.ok(toolNames.includes('devsync_daily_summary'));
   assert.ok(toolNames.includes('devsync_p2p_peers'));
   assert.ok(toolNames.includes('devsync_catch_up'));
+  assert.ok(toolNames.includes('devsync_add_batch'));
 });
 
 test('MCP server dispatches tools/call to daemon dependency injection', async () => {
@@ -84,11 +85,18 @@ test('MCP server dispatches tools/call to daemon dependency injection', async ()
   assert.equal(catchUpCall.id, 14);
   assert.equal(catchUpCall.result.isError, false);
 
-  const errorCall = await handleMcpMessage(
-    { jsonrpc: '2.0', id: 15, method: 'tools/call', params: { name: 'unknown_tool', arguments: {} } },
+  const addBatchCall = await handleMcpMessage(
+    { jsonrpc: '2.0', id: 15, method: 'tools/call', params: { name: 'devsync_add_batch', arguments: { paths: ['/path/to/repo'] } } },
     { callDaemon: fakeDaemon }
   );
-  assert.equal(errorCall.id, 15);
+  assert.equal(addBatchCall.id, 15);
+  assert.equal(addBatchCall.result.isError, false);
+
+  const errorCall = await handleMcpMessage(
+    { jsonrpc: '2.0', id: 16, method: 'tools/call', params: { name: 'unknown_tool', arguments: {} } },
+    { callDaemon: fakeDaemon }
+  );
+  assert.equal(errorCall.id, 16);
   assert.equal(errorCall.result.isError, true);
   assert.match(errorCall.result.content[0].text, /desconhecida/);
 });

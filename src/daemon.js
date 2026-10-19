@@ -9,7 +9,7 @@ import { validateWebhookSettings, sendWebhook } from './webhooks.js';
 import { calculateMetrics } from './metrics.js';
 import { scanDiff } from './secrets.js';
 import { resolveConflictAI, generateCatchUpSummary } from './ai.js';
-import { scoutRepositories } from './scout.js';
+import { scoutRepositories, inspectScoutedRepo } from './scout.js';
 import { syncBranchWorktree } from './worktree.js';
 import { P2PManager } from './p2p.js';
 import { startRemote, validateRemote } from './remote-client.js';
@@ -135,10 +135,24 @@ export async function daemon() {
         return { ok: true, status: res.status };
       }
       if (data.command === 'scout') {
-        const rootPath = data.path || path.resolve(process.cwd(), '..');
         const existingPaths = new Set(config.projects.map(p => p.path));
+        if (Array.isArray(data.paths) && data.paths.length) {
+          const repos = [];
+          for (const rawP of data.paths) {
+            if (!rawP || typeof rawP !== 'string') continue;
+            const p = path.resolve(rawP.trim());
+            try {
+              const info = await inspectScoutedRepo(p, existingPaths);
+              repos.push(info);
+            } catch (err) {
+              repos.push({ path: p, name: path.basename(p), hasGit: false, hasRemote: false, isDirty: false, dirtyCount: 0, branch: '-', error: err.message, alreadyRegistered: false });
+            }
+          }
+          return { repos, repositories: repos, found: repos.length, count: repos.length, registered: repos.filter(r => r.alreadyRegistered).length };
+        }
+        const rootPath = data.path || data.rootDir || path.resolve(process.cwd(), '..');
         const repos = await scoutRepositories(rootPath, { existingPaths });
-        return { root: rootPath, repos, found: repos.length };
+        return { root: rootPath, rootDir: rootPath, repos, repositories: repos, found: repos.length, count: repos.length, registered: repos.filter(r => r.alreadyRegistered).length };
       }
       if (data.command === 'add-batch') {
         if (!Array.isArray(data.paths) || !data.paths.length) throw new CommandError('Informe uma lista de caminhos em paths.');
@@ -146,13 +160,13 @@ export async function daemon() {
         const errors = [];
         for (const p of data.paths) {
           try {
-            const res = await add(p);
-            added.push(res);
+            const res = await perform({ command: 'add', path: p }, source);
+            added.push(res.project);
           } catch (err) {
             errors.push({ path: p, error: err.message });
           }
         }
-        return { ok: true, added, errors };
+        return { ok: true, added, addedCount: added.length, errors, total: data.paths.length };
       }
       if (data.command === 'worktree-sync') {
         const repo = config.projects.find(p => p.id === data.id);
