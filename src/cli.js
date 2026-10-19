@@ -15,7 +15,7 @@ try {
     await startMcpServer();
   }
   else if (command === 'help') {
-    console.log(`DevSync 0.7 — Node.js 22+ e Git
+    console.log(`DevSync 0.8 — Node.js 22+ e Git
 
   devsync daemon                         Inicia serviço local
   devsync mcp                            Inicia servidor MCP (Model Context Protocol) via stdio
