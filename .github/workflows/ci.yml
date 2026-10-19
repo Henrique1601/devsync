@@ -41,6 +41,16 @@ jobs:
           node --check src/checkpoint.js
           node --check src/service-lock.js
           node --check src/mcp.js
+          node --check src/store.js
+          node --check src/ai.js
+          node --check src/p2p.js
+          node --check src/scout.js
+          node --check src/secrets.js
+          node --check src/metrics.js
+          node --check src/webhooks.js
+          node --check src/worktree.js
+          node --check src/remote-client.js
+          node --check src/operations.js
 
       - name: Run automated test suite
         run: npm test
