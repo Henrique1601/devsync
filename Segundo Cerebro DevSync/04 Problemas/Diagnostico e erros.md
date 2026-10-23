@@ -106,6 +106,21 @@ A fonte precisa ser uma pasta HTTPS publicada, com manifesto e artefatos compat�
 
 Acesso à API sem token resulta em 401. Abra pelo desktop ou pelo endereço exibido pelo serviço. Mensagens de listener assíncrono de extensão não identificam, sozinhas, a causa de uma falha do DevSync; examine o erro da requisição e o texto do painel.
 
+
+## Alto consumo de CPU e processos transitórios (Travamentos no Windows)
+
+**Sinal:** Processador com 100% de uso, travamentos intermitentes ou lentidão geral no PC enquanto o DevSync está em execução; Gerenciador de Tarefas exibindo criação frequente de processos transitórios (ex: instâncias de git.exe, subprocessos do Node ou renderizadores do Electron).
+
+**Causa mapeada:**
+1. **Loop de polling a cada 1 segundo (setInterval no tick() do src/daemon.js):** A cada segundo, o daemon verifica projetos pendentes. Se houver muitos projetos ou repositórios com muitos arquivos, a checagem frequente (inspect, git status --porcelain) dispara comandos Git sucessivos.
+2. **Spawns concorrentes de git.exe:** Repositórios grandes com status sujo ou sem upstream podem gerar processos transitórios de Git em rápida sucessão, saturando a fila de I/O e threads do Windows.
+3. **Falta de backoff/throttling:** Repositórios em estado de erro ou divergência continuam sendo consultados no ciclo padrão sem intervalo estendido.
+
+**Plano de Melhoria & Mitigação futura:**
+1. Aumentar o intervalo base do tick de 1000ms para 3000ms-5000ms quando em repouso.
+2. Implementar backoff exponencial para projetos com erros consecutivos.
+3. Serializar estritamente execuções de inspeção Git via fila delimitada (concurrency limit = 1 ou 2 simultâneos).
+4. Adicionar debounce nas requisições do HUD/Desktop e pausar verificações ativas quando a janela estiver minimizada/ociosa.
 ## Registrar e confirmar
 
 Use [[06 Modelos/Incidente]] com contexto, passos, resultado esperado e observado. Sem credenciais. Considere resolvido quando o fluxo original funcionar novamente e houver um resultado correspondente no histórico.

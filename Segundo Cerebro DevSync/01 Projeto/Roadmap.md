@@ -46,6 +46,11 @@ Use esta nota para acompanhar o ciclo de entregas e os próximos passos do DevSy
 
 ## Próximos Passos (v0.8.0+)
 
+- [ ] **Otimização de Processos em Background e Consumo de CPU (Mitigação de Processos Transitórios):**
+  - Investigar e limitar o surgimento de múltiplos processos transitórios/filhos (ex: spawns de git.exe em loop, polling agressivo a cada 1 segundo no tick() do daemon ou subprocessos concorrentes).
+  - Implementar debouncing, backoff exponencial em inatividade/falha e throttling no agendamento de sincronização para evitar congelamentos e picos de 100% de CPU no Windows.
+  - Adicionar controle de concorrência global e monitoramento do ciclo de vida de processos gerados pelo DevSync.
+
 - [ ] Validação de assinatura de código (code-signing) com certificado EV para suprimir alertas do Windows Defender SmartScreen.
 - [ ] Suporte a múltiplos coordenadores remotos em cluster (alta disponibilidade).
 - [ ] Criptografia end-to-end com curvas elípticas (Ed25519) nos payloads P2P LAN.
