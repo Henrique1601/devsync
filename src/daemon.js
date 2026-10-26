@@ -17,7 +17,7 @@ import { acquireServiceLock } from './service-lock.js';
 import { rulesFor, validateRules, isSyncDue } from './rules.js';
 import { createHistory, historySnapshot, stateReasons } from './history.js';
 import { diagnose } from './onboarding.js';
-import { settleOperations, withBusy } from './operations.js';
+import { settleOperations, withBusy, mapConcurrent } from './operations.js';
 class CommandError extends Error {}
 export async function daemon() {
   await mkdir(home, { recursive: true, mode: 0o700 });
@@ -30,6 +30,7 @@ export async function daemon() {
     const history = await createHistory();
     const lastRuns = new Map();
     const states = new Map();
+    const consecutiveErrors = new Map();
     const busy = new Set();
     const token = randomBytes(32).toString('hex');
     const page = await readFile(fileURLToPath(new URL('../ui/index.html', import.meta.url)));
@@ -46,8 +47,13 @@ export async function daemon() {
       try {
         const result = await synchronize(repo);
         states.set(repo.id, { ...result, reason: stateReasons[result.state], checkedAt: new Date().toISOString() });
+        if (result.state === 'synced' || result.state === 'ahead' || result.state === 'behind') consecutiveErrors.set(repo.id, 0);
+        else if (['error', 'diverged'].includes(result.state)) consecutiveErrors.set(repo.id, (consecutiveErrors.get(repo.id) || 0) + 1);
       }
-      catch (error) { states.set(repo.id, { ...error.activity, state: 'error', message: error.message.startsWith('Checkpoint bloqueado:') ? error.message : 'Falha no Git: confira rede, credenciais, identidade de commit e upstream pelo terminal.', checkedAt: new Date().toISOString() }); }
+      catch (error) {
+        consecutiveErrors.set(repo.id, (consecutiveErrors.get(repo.id) || 0) + 1);
+        states.set(repo.id, { ...error.activity, state: 'error', message: error.message.startsWith('Checkpoint bloqueado:') ? error.message : 'Falha no Git: confira rede, credenciais, identidade de commit e upstream pelo terminal.', checkedAt: new Date().toISOString() });
+      }
       lastRuns.set(repo.id, Date.now());
       const result = states.get(repo.id);
       await history.append({ projectId: repo.id, projectName: repo.name, source, action: 'sync', startedAt, finishedAt: result.checkedAt,
@@ -67,7 +73,8 @@ export async function daemon() {
     async function tick() {
       if (ticking || stopping) return;
       ticking = true;
-      const pending = mutations.then(() => settleOperations(config.projects.filter(repo => isSyncDue(repo, lastRuns.get(repo.id))).map(repo => sync(repo))));
+      const dueProjects = config.projects.filter(repo => isSyncDue(repo, lastRuns.get(repo.id), Date.now(), consecutiveErrors.get(repo.id) || 0));
+      const pending = mutations.then(() => mapConcurrent(dueProjects.map(repo => () => sync(repo)), 2));
       mutations = pending.catch(() => {});
       try { await pending; } finally { ticking = false; }
     }
@@ -98,7 +105,7 @@ export async function daemon() {
       }
       if (data.command === 'sync-all') {
         const active = config.projects.filter(p => !p.paused && !busy.has(p.id));
-        await settleOperations(active.map(repo => sync(repo, source)));
+        await mapConcurrent(active.map(repo => () => sync(repo, source)), 2);
         return { synced: active.length, projects: projectStatus() };
       }
       if (data.command === 'remote-config') {
@@ -398,7 +405,7 @@ export async function daemon() {
       p2p.start();
     } catch {}
     console.log(`Painel local: http://127.0.0.1:${port}/#${token}`);
-    timer = setInterval(() => tick().catch(() => console.error('Não foi possível concluir a verificação ou gravar o histórico.')), 1000);
+    timer = setInterval(() => tick().catch(() => console.error('Não foi possível concluir a verificação ou gravar o histórico.')), 2500);
     async function stop() {
       if (stopping) return; stopping = true;
       clearInterval(timer);

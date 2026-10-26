@@ -46,10 +46,12 @@ Use esta nota para acompanhar o ciclo de entregas e os próximos passos do DevSy
 
 ## Próximos Passos (v0.8.0+)
 
-- [ ] **Otimização de Processos em Background e Consumo de CPU (Mitigação de Processos Transitórios):**
-  - Investigar e limitar o surgimento de múltiplos processos transitórios/filhos (ex: spawns de git.exe em loop, polling agressivo a cada 1 segundo no tick() do daemon ou subprocessos concorrentes).
-  - Implementar debouncing, backoff exponencial em inatividade/falha e throttling no agendamento de sincronização para evitar congelamentos e picos de 100% de CPU no Windows.
-  - Adicionar controle de concorrência global e monitoramento do ciclo de vida de processos gerados pelo DevSync.
+- [x] **Otimização de Processos em Background e Consumo de CPU (Mitigação de Processos Transitórios):**
+  - Concurrency limiter (`mapConcurrent` com max 2 tarefas paralelas) para serializar checagens e sincronizações Git, eliminando tempestades de processos concorrentes de `git.exe`.
+  - `windowsHide: true` em todos os spawns de `child_process.execFile` para evitar overhead de criação de janelas/consoles ocultos no Windows.
+  - Intervalo de polling reduzido de 1000ms para 2500ms no loop principal do daemon.
+  - Backoff exponencial inteligente em caso de erros consecutivos ou falhas de sincronização (multiplicador até 5x, teto 300s).
+  - Throttling e congelamento de polling na UI quando a aba do navegador/desktop estiver oculta (`document.hidden`).
 
 - [ ] Validação de assinatura de código (code-signing) com certificado EV para suprimir alertas do Windows Defender SmartScreen.
 - [ ] Suporte a múltiplos coordenadores remotos em cluster (alta disponibilidade).

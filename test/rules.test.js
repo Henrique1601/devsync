@@ -23,3 +23,17 @@ test('wildcard matching completes adversarial patterns within a bounded child pr
   assert.equal(result.stdout.trim(),'false');
   assert.ok(matchesInclude('a/b/c.js',['**/?.js']));assert.ok(!matchesInclude('a/b/c.js',['a/*.js']));
 });
+
+
+test('isSyncDue and getSyncIntervalMs apply exponential backoff on consecutive errors', async () => {
+  const { getSyncIntervalMs } = await import('../src/rules.js');
+  const repo = { syncIntervalSeconds: 20 };
+  assert.equal(getSyncIntervalMs(repo, 0), 20000);
+  assert.equal(getSyncIntervalMs(repo, 1), 40000);
+  assert.equal(getSyncIntervalMs(repo, 2), 80000);
+  assert.equal(getSyncIntervalMs(repo, 3), 100000); // capped at 5x base (100s)
+
+  assert.ok(isSyncDue(repo, 1000, 21001, 0));
+  assert.ok(!isSyncDue(repo, 1000, 21001, 1)); // needs 40s
+  assert.ok(isSyncDue(repo, 1000, 41001, 1));
+});

@@ -48,4 +48,16 @@ function globMatches(file, pattern) {
 }
 
 export function matchesInclude(file, patterns) { return patterns.some(pattern => globMatches(file, pattern)); }
-export function isSyncDue(repo, lastRun, now = Date.now()) { return lastRun === undefined || now - lastRun >= rulesFor(repo).syncIntervalSeconds * 1000; }
+
+export function getSyncIntervalMs(repo, consecutiveErrors = 0) {
+  const baseSeconds = rulesFor(repo).syncIntervalSeconds;
+  if (!consecutiveErrors || consecutiveErrors <= 0) return baseSeconds * 1000;
+  // Exponential backoff capped at 5x base interval or 300s
+  const multiplier = Math.min(Math.pow(2, Math.min(consecutiveErrors, 4)), 5);
+  return Math.min(baseSeconds * multiplier, 300) * 1000;
+}
+
+export function isSyncDue(repo, lastRun, now = Date.now(), consecutiveErrors = 0) {
+  if (lastRun === undefined) return true;
+  return now - lastRun >= getSyncIntervalMs(repo, consecutiveErrors);
+}

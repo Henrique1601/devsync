@@ -9,7 +9,7 @@ export async function git(cwd, ...args) {
 }
 export async function gitRaw(cwd, ...args) {
   const { stdout } = await exec('git', ['-C', cwd, ...args], {
-    timeout: 60000, maxBuffer: 1024 * 1024,
+    timeout: 60000, maxBuffer: 1024 * 1024, windowsHide: true,
     env: { ...process.env, GIT_TERMINAL_PROMPT: '0', GIT_SSH_COMMAND: 'ssh -o BatchMode=yes -o ConnectTimeout=15' }
   });
   return stdout;

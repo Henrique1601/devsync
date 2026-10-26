@@ -11,7 +11,7 @@ fontes: []
 Capture dúvidas e ideias rapidamente. Depois ligue cada item a uma nota e a uma ação verificável.
 
 ## Pendências atuais
-- [ ] **Mitigação de processos transitórios e alto consumo de CPU.** → [[01 Projeto/Roadmap]] e [[04 Problemas/Diagnostico e erros]]
+- [x] **Mitigação de processos transitórios e alto consumo de CPU.** (Concluído: mapConcurrent, windowsHide, backoff exponencial e throttling de UI) → [[01 Projeto/Roadmap]] e [[04 Problemas/Diagnostico e erros]]
 - [ ] Escolher hospedagem do coordenador. → [[03 Engenharia/Hospedagem e operacao]]
 - [ ] Publicar fonte HTTPS das atualizações. → [[02 Uso/Atualizacoes do aplicativo]]
 - [ ] Fazer o primeiro teste real Casa ↔ Trabalho. → [[02 Uso/Rotina Casa e Trabalho]]

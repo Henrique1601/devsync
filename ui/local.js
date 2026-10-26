@@ -516,5 +516,17 @@ async function loadP2pPeers(){
   }catch(e){host.replaceChildren(el('p','P2P: '+e.message,'hint'))}
 }
 $('#p2p-refresh')?.addEventListener('click',loadP2pPeers);
-refresh();setInterval(refresh,5000);setInterval(()=>{if(view==='history')loadHistory();if(view==='metrics')loadMetrics()},10000);
+refresh();
+setInterval(()=>{
+  if(document.hidden) return;
+  refresh();
+}, 8000);
+setInterval(()=>{
+  if(document.hidden) return;
+  if(view==='history')loadHistory();
+  if(view==='metrics')loadMetrics();
+}, 15000);
+document.addEventListener('visibilitychange', () => {
+  if(!document.hidden) { refresh(); if(view==='history')loadHistory(); if(view==='metrics')loadMetrics(); }
+});
 
