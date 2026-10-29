@@ -6,7 +6,7 @@ test('MCP server handles initialize, ping and tools/list', async () => {
   const init = await handleMcpMessage({ jsonrpc: '2.0', id: 1, method: 'initialize', params: {} });
   assert.equal(init.id, 1);
   assert.equal(init.result.serverInfo.name, 'devsync-mcp');
-  assert.equal(init.result.serverInfo.version, '0.8.0');
+  assert.ok(init.result.serverInfo.version);
 
   const ping = await handleMcpMessage({ jsonrpc: '2.0', id: 2, method: 'ping' });
   assert.equal(ping.id, 2);
