@@ -9,7 +9,10 @@ function initTheme(){
   const apply=next=>{
     document.documentElement.dataset.theme=next;
     const btn=$('#theme-toggle');
-    if(btn)btn.textContent='Tema: '+(next==='light'?'Claro':'Escuro');
+    if(btn){
+      const isDark=next==='dark';
+      btn.innerHTML=`<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${isDark?'<circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>':'<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>'}</svg><span>Tema: ${isDark?'Escuro':'Claro'}</span>`;
+    }
     try{localStorage.setItem('devsync-theme',next)}catch{}
   };
   apply(theme);
@@ -21,7 +24,18 @@ const labels={synced:'Sincronizado',dirty:'Alterações locais pendentes',diverg
 const sources={automatic:'Automático',manual:'Painel ou terminal',remote:'Painel remoto',registration:'Cadastro'};
 let view='projects',refreshing=false,historyLoading=false,updateLoading=false,updatesInitialized=false;const cards=new Map();
 function el(tag,text,css){const n=document.createElement(tag);if(text!==undefined)n.textContent=text;if(css)n.className=css;return n}
-function notice(text){feedback.textContent=text}function time(value){return value?new Date(value).toLocaleString('pt-BR'):'aguardando'}
+let noticeTimer=null;
+function notice(text){
+  if(noticeTimer)clearTimeout(noticeTimer);
+  if(!text){feedback.replaceChildren();return}
+  feedback.replaceChildren();
+  const icon=document.createElement('span');
+  icon.innerHTML='<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>';
+  const span=document.createElement('span');
+  span.textContent=text;
+  feedback.append(icon,span);
+  noticeTimer=setTimeout(()=>{feedback.replaceChildren()},8000);
+}function time(value){return value?new Date(value).toLocaleString('pt-BR'):'aguardando'}
 async function api(route,body){const r=await fetch('/api/'+route,{method:body?'POST':'GET',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},...(body?{body:JSON.stringify(body)}:{})});const d=await r.json();if(!r.ok)throw Error(d.error||'Não foi possível concluir.');return d}
 function showView(next){view=next;document.querySelectorAll('.view').forEach(n=>n.hidden=n.id!=='view-'+view);document.querySelectorAll('[data-view]').forEach(n=>n.setAttribute('aria-pressed',String(n.dataset.view===view)));if(view==='history')loadHistory();if(view==='metrics')loadMetrics();if(view==='settings'){refreshUpdates();loadP2pPeers()}}
 document.querySelectorAll('[data-view],[data-go]').forEach(b=>b.addEventListener('click',()=>showView(b.dataset.view||b.dataset.go)));
@@ -170,27 +184,39 @@ $('#diff-close')?.addEventListener('click',()=>{const m=$('#diff-modal');if(type
 
 function field(parent,id,label,type,value,attrs={}){const box=el('div'),title=el('label',label),input=el(type==='textarea'?'textarea':'input');title.htmlFor=id;input.id=id;if(type!=='textarea')input.type=type;input.value=value;for(const[k,v]of Object.entries(attrs))input.setAttribute(k,v);box.append(title,input);parent.append(box);return input}
 function card(project){
-  const node=el('section'),top=el('div',undefined,'project-top'),title=el('div'),status=el('span',undefined,'status');title.append(el('h3',project.name),el('code',project.path));top.append(title,status);
-  const meta=el('p',undefined,'project-meta'),reason=el('p',undefined,'project-reason'),controls=el('div',undefined,'actions'),buttons={};
-  for(const key of ['sync','diff','predict','stash','secrets','pause','push','checkpoint']){const b=el('button');b.type='button';buttons[key]=b;controls.append(b)}
-  const details=el('details');details.append(el('summary','Regras de sincronização e checkpoints'));const form=el('form',undefined,'grid');
+  const node=el('section'),top=el('div',undefined,'project-top'),title=el('div'),status=el('span',undefined,'status');
+  title.append(el('h3',project.name),el('code',project.path));
+  top.append(title,status);
+  const meta=el('div',undefined,'project-meta'),reason=el('p',undefined,'project-reason'),controls=el('div',undefined,'actions'),buttons={};
+  for(const key of ['sync','diff','predict','stash','secrets','pause','push','checkpoint']){
+    const b=el('button');b.type='button';
+    if(key==='sync')b.classList.add('primary');
+    buttons[key]=b;
+    controls.append(b);
+  }
+  const details=el('details');details.append(el('summary','⚙️ Regras de sincronização e checkpoints'));const form=el('form',undefined,'grid');
   const interval=field(form,'interval-'+project.id,'Verificar a cada (segundos)','number',project.syncIntervalSeconds??30,{min:15,max:3600,required:''});
   const delay=field(form,'delay-'+project.id,'Esperar sem alterações (segundos)','number',project.checkpointDelaySeconds??60,{min:30,max:3600,required:''});
   const box=el('div',undefined,'full');form.append(box);const include=field(box,'include-'+project.id,'Arquivos permitidos nos checkpoints','textarea',(project.checkpointInclude||['**']).join('\n'),{rows:3,required:''});
-  form.append(el('p','Um padrão por linha: src/**, README.md. ** permite todos os arquivos rastreados. Arquivos fora das regras são preservados.','hint full'));const save=el('button','Salvar regras');save.type='submit';form.append(save);details.append(form);
+  form.append(el('p','Um padrão por linha: src/**, README.md. ** permite todos os arquivos rastreados. Arquivos fora das regras são preservados.','hint full'));
+  const save=el('button','Salvar regras','primary');save.type='submit';form.append(save);details.append(form);
   form.addEventListener('submit',async e=>{e.preventDefault();save.disabled=true;try{await api('command',{command:'settings',id:project.id,syncIntervalSeconds:Number(interval.value),checkpointDelaySeconds:Number(delay.value),checkpointInclude:include.value.split(/\r?\n/).map(s=>s.trim()).filter(Boolean)});notice('Regras salvas para '+project.name+'.');await refresh()}catch(error){notice(error.message)}finally{save.disabled=false}});
   node.append(top,meta,reason,controls,details);
   function update(p){
     const stateKey=p.paused?'paused':p.state;
     status.className='status status--'+stateKey;
-    status.textContent=(p.paused?'Pausado':labels[p.state]||p.state)+(p.busy?' · Sincronizando…':'');
-    meta.textContent='Branch: '+p.branch+' · Verificação: '+(p.syncIntervalSeconds??30)+'s · Última: '+time(p.checkedAt);
+    const dotColor=p.paused?'var(--muted)':stateKey==='synced'?'var(--ok)':['dirty','ahead','behind'].includes(stateKey)?'var(--warn)':'var(--danger)';
+    status.innerHTML=`<span class="live-beacon" style="background:${dotColor};box-shadow:0 0 0 0 ${dotColor};animation:${p.busy?'beacon-pulse 1s infinite':'beacon-pulse 2.2s infinite'}"></span> <span>${(p.paused?'Pausado':labels[p.state]||p.state)+(p.busy?' · Sincronizando…':'')}</span>`;
+    meta.replaceChildren();
+    const branchBadge=el('span',undefined,'branch-badge');
+    branchBadge.innerHTML=`<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><line x1="6" y1="3" x2="6" y2="15"></line><circle cx="18" cy="6" r="3"></circle><circle cx="6" cy="18" r="3"></circle><path d="M18 9a9 9 0 0 1-9 9"></path></svg> ${p.branch||'main'}`;
+    meta.append(branchBadge,el('span',`· Checagem: ${p.syncIntervalSeconds??30}s · Última: ${time(p.checkedAt)}`));
     reason.textContent=p.message||p.reason||'';reason.hidden=!reason.textContent;
     buttons.diff.textContent='Ver alterações';buttons.diff.disabled=p.busy;buttons.diff.onclick=()=>openDiff(p.id,p.name);
     buttons.predict.textContent='Simular conflitos';buttons.predict.disabled=p.busy;buttons.predict.onclick=()=>openPredictConflicts(p.id,p.name);
     buttons.stash.textContent='Stash + Sincronizar';buttons.stash.hidden=p.state!=='dirty';buttons.stash.disabled=p.busy;buttons.stash.onclick=()=>command('stash-sync',p.id,{pop:true});
     buttons.secrets.textContent='Escanear segredos';buttons.secrets.disabled=p.busy;buttons.secrets.onclick=()=>openSecretScanner(p.id,p.name);
-    const actions={sync:['sync','Sincronizar agora'],pause:[p.paused?'resume':'pause',p.paused?'Retomar':'Pausar'],push:[p.autoPush?'push-off':'push-on',p.autoPush?'Desativar envio':'Ativar envio de commits'],checkpoint:[p.checkpoint?'checkpoint-off':'checkpoint-on',p.checkpoint?'Desativar checkpoints':'Ativar checkpoints']};
+    const actions={sync:['sync','Sincronizar agora'],pause:[p.paused?'resume':'pause',p.paused?'Retomar':'Pausar'],push:[p.autoPush?'push-off':'push-on',p.autoPush?'Desativar envio':'Ativar envio'],checkpoint:[p.checkpoint?'checkpoint-off':'checkpoint-on',p.checkpoint?'Desativar checkpoints':'Ativar checkpoints']};
     for(const[k,[action,text]]of Object.entries(actions)){buttons[k].textContent=text;buttons[k].disabled=p.busy;buttons[k].onclick=()=>command(action,p.id)}
   }
   update(project);return{node,update};

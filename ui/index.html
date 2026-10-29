@@ -1,31 +1,406 @@
-<!doctype html><html lang="pt-BR" data-theme="dark"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>DevSync — seus projetos</title><link rel="stylesheet" href="/assets/local.css"><script src="/assets/local.js" defer></script></head><body>
-<a class="skip" href="#content">Pular para o conteúdo</a><header><div><h1>DevSync</h1><p>Seu trabalho, pronto no próximo computador.</p></div><div class="row"><button id="theme-toggle" type="button" aria-label="Alternar tema claro ou escuro">Tema: Escuro</button><span class="badge">Serviço local · 0.8</span></div></header>
-<nav aria-label="Navegação principal"><button type="button" data-view="projects" aria-pressed="true">Projetos</button><button type="button" data-view="metrics" aria-pressed="false">Estatísticas</button><button type="button" data-view="setup" aria-pressed="false">Configurar projeto</button><button type="button" data-view="history" aria-pressed="false">Histórico</button><button type="button" data-view="settings" aria-pressed="false">Computador</button></nav><p id="feedback" role="status" aria-live="polite"></p>
-<main id="content" tabindex="-1">
-<div id="view-projects" class="view"><div class="heading"><div><h2>Seus projetos</h2><p>Sincronização, pendências, diffs e regras em um só lugar.</p></div><div class="row"><button id="sync-all" type="button" class="primary">Sincronizar todos</button><button type="button" data-go="setup">Adicionar projeto</button></div></div><div id="projects"><p class="empty">Carregando seus projetos…</p></div></div>
-<div id="view-metrics" class="view" hidden><div class="heading"><div><h2>Estatísticas de Produtividade</h2><p>Métricas de sincronização, tempo economizado e atividade dos últimos 7 dias.</p></div><button id="metrics-refresh" type="button">Atualizar métricas</button></div>
-<div class="metrics-grid"><div class="metric-card"><span class="metric-label">Total de Sincronizações</span><span class="metric-value" id="metric-total-syncs">0</span></div><div class="metric-card"><span class="metric-label">Taxa de Sucesso</span><span class="metric-value" id="metric-success-rate">100%</span></div><div class="metric-card"><span class="metric-label">Commits Transferidos</span><span class="metric-value" id="metric-commits">0</span></div><div class="metric-card"><span class="metric-label">Tempo Economizado</span><span class="metric-value" id="metric-hours">0h</span></div></div>
-<section><h3>Atividade nos Últimos 7 Dias</h3><div id="metrics-chart" class="chart-container"></div></section>
-<section><h3>Produtividade por Projeto</h3><div id="metrics-projects-list"></div></section></div>
-<div id="view-setup" class="view" hidden><h2>Configure seu projeto</h2><p>1. Escolha a pasta. 2. Verifique o Git. 3. Cadastre e sincronize.</p>
-<section id="scout-section"><div class="heading"><div><h3>Importação em Lote & Varredura de Projetos (Repo Scout)</h3><p>Importe múltiplos projetos de uma pasta ou selecione várias pastas diretamente no seu computador.</p></div><div class="row"><button id="scout-browse-multiple" type="button" class="primary">📁 Selecionar Várias Pastas…</button></div></div><label for="scout-root">Ou varrer uma pasta e seus subprojetos Git:</label><div class="row"><input id="scout-root" placeholder="Caminho da pasta raiz (ex: C:\Programacao ou escolha ao lado)" autocomplete="off"><button id="scout-browse-root" type="button" hidden>Escolher pasta raiz</button><button id="scout-scan" type="button">Varrer subpastas</button></div><div id="scout-results" class="scout-results-container"></div></section>
-<section><h3>Já tenho o projeto neste computador</h3><form id="add"><label for="folder">Pasta local do projeto</label><div class="row"><input id="folder" required placeholder="C:\Projetos\meu-crm" autocomplete="off"><button id="browse" type="button" hidden>Selecionar pasta</button></div><p class="hint">Para cadastrar pelo link do GitHub, use a clonagem abaixo.</p><div class="actions"><button id="diagnose" type="button">Verificar configuração</button><button type="submit" class="primary">Cadastrar</button></div></form><div id="diagnostics" aria-live="polite"></div></section>
-<section><h3>Clonar do GitHub</h3><p>O Git usa sua autenticação já configurada.</p><form id="clone"><label for="repository">Link do repositório</label><input id="repository" type="url" required placeholder="https://github.com/usuario/projeto.git"><label for="destination">Nova pasta de destino</label><input id="destination" required placeholder="C:\Projetos\nova-pasta"><p class="hint">A pasta de destino não deve existir. O diretório pai precisa estar criado.</p><button type="submit" class="primary">Clonar e cadastrar</button></form></section>
-<section><h3>Depois do cadastro</h3><p>Envio de commits e checkpoints começam desativados. Ative essas opções em cada projeto. Para acompanhar Casa e Trabalho, conecte cada PC na tela Computador.</p><button type="button" data-go="settings">Conectar este computador</button></section></div>
-<div id="view-history" class="view" hidden><div class="heading"><div><h2>Histórico de sincronizações</h2><p>Resultados, commits e motivos das pendências.</p></div><div class="row"><button id="history-catchup" type="button">🌅 Catch-Up Matinal</button><button id="history-daily" type="button">Gerar Diário no Obsidian</button><button id="history-refresh" type="button">Atualizar histórico</button></div></div><label for="history-project">Projeto</label><select id="history-project"><option value="">Todos os projetos</option></select><div id="history-list"></div></div>
-<div id="view-settings" class="view" hidden><h2>Este computador</h2><p>Conexão remota, webhooks, inicialização, MCP e versões do aplicativo.</p>
-<section id="hud-section"><h3>DevSync Dynamic HUD</h3><p>Pílula flutuante translúcida no desktop do Windows para monitoramento em tempo real.</p><button id="btn-toggle-hud" type="button">Alternar HUD Flutuante (Atalho: Ctrl+Shift+H)</button></section>
-<section id="p2p-section"><h3>Sincronização P2P Direta (Rede Local LAN)</h3><p id="p2p-status">DevSync descobre automaticamente instâncias na mesma rede local via UDP Beacon (Porta 48123).</p><div id="p2p-peers-list"></div><button id="p2p-refresh" type="button">Atualizar Computadores na Rede</button></section>
-<section><h3>Painel remoto</h3><p id="remote-status">Verificando conexão…</p><p>Gere uma conexão no painel remoto. Use um token separado para cada computador.</p><form id="remote" class="grid"><div><label for="remote-url">Endereço do servidor</label><input id="remote-url" type="url" required placeholder="https://seu-servidor"></div><div><label for="remote-name">Nome deste computador</label><input id="remote-name" required placeholder="Casa ou Trabalho" maxlength="80"></div><div><label for="remote-id">ID do dispositivo</label><input id="remote-id" required autocomplete="off"></div><div><label for="remote-token">Token do dispositivo</label><input id="remote-token" type="password" required autocomplete="off"></div><div class="actions full"><button type="submit" class="primary">Conectar</button><button id="test-remote" type="button">Testar servidor</button><button id="disconnect" type="button">Desconectar painel remoto</button></div></form></section>
-<section><h3>Notificações Externas (Webhooks)</h3><p id="webhook-status">Nenhum webhook configurado.</p><p>Envie alertas para Discord, Telegram ou endpoint HTTP JSON quando commits forem sincronizados ou houver divergências.</p><form id="webhook" class="grid"><div><label for="webhook-url">URL do webhook</label><input id="webhook-url" type="url" required placeholder="https://discord.com/api/webhooks/... ou https://..."></div><div><label for="webhook-service">Serviço</label><select id="webhook-service"><option value="discord">Discord</option><option value="telegram">Telegram</option><option value="generic">Genérico (JSON POST)</option></select></div><div id="webhook-chat-box" hidden><label for="webhook-chat-id">Chat ID (apenas Telegram)</label><input id="webhook-chat-id" placeholder="-100123456789"></div><div class="actions full"><button type="submit" class="primary">Salvar webhook</button><button id="test-webhook" type="button">Testar webhook</button><button id="disconnect-webhook" type="button">Desativar webhook</button></div></form></section>
-<section id="desktop-settings" hidden><h3>Inicialização</h3><label class="check"><input type="checkbox" id="startup"> Iniciar com o Windows</label><p class="hint">Fechar a janela mantém o serviço na bandeja. Use Sair no ícone para encerrar.</p></section>
-<section><h3>Atualizações do aplicativo</h3><p id="update-state" role="status">Abra o aplicativo desktop para configurar as atualizações.</p><div id="update-controls" hidden><form id="updates"><label for="update-feed">Endereço de atualizações</label><input id="update-feed" type="url" placeholder="https://seu-servidor/updates/"><p class="hint">Use o endereço de versões publicado pelo responsável pelo aplicativo.</p><label class="check"><input id="update-enabled" type="checkbox"> Verificar novas versões automaticamente</label><button type="submit">Salvar preferência</button></form><div class="actions"><button id="update-check" type="button">Buscar atualização</button><button id="update-download" type="button" hidden>Baixar atualização</button><button id="update-install" type="button" class="primary" hidden>Instalar e reiniciar</button></div><progress id="update-progress" max="100" value="0" hidden aria-label="Progresso do download"></progress></div></section>
-<section><h3>Servidor MCP para Agentes de IA</h3><p>Conecte agentes como Claude Code, Cursor ou Antigravity diretamente ao DevSync via stdio:</p><code>node src/cli.js mcp</code></section>
-<section><h3>Como protege seu trabalho</h3><p>Recebimento somente por avanço direto do histórico. Divergências, troca de branch e operações Git em andamento precisam de revisão. Arquivos ainda não salvos no editor não podem ser sincronizados.</p></section></div>
-</main>
-<dialog id="diff-modal" aria-labelledby="diff-title"><div class="modal-header"><h3 id="diff-title">Alterações do projeto</h3><button id="diff-close" type="button">Fechar</button></div><div id="diff-body"></div></dialog>
-<dialog id="conflict-modal" class="modal-large" aria-labelledby="conflict-title"><div class="modal-header"><h3 id="conflict-title">Simulação & Resolução de Conflitos</h3><button id="conflict-close" type="button">Fechar</button></div><div id="conflict-body"></div></dialog>
-<dialog id="secrets-modal" aria-labelledby="secrets-title"><div class="modal-header"><h3 id="secrets-title">Varredura de Segredos</h3><button id="secrets-close" type="button">Fechar</button></div><div id="secrets-body"></div></dialog>
-<dialog id="catchup-modal" aria-labelledby="catchup-title"><div class="modal-header"><h3 id="catchup-title">🌅 Catch-Up Matinal & Retomada de Contexto</h3><button id="catchup-close" type="button">Fechar</button></div><div id="catchup-body"></div></dialog>
-<dialog id="batch-modal" aria-labelledby="batch-title"><div class="modal-header"><h3 id="batch-title">📁 Importar Várias Pastas de Projetos</h3><button id="batch-close" type="button">Fechar</button></div><div id="batch-body"></div></dialog>
-<footer>DevSync <span id="version">0.8</span> · Código pelo GitHub. Controle pelo seu computador.</footer></body></html>
+<!doctype html>
+<html lang="pt-BR" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>DevSync — Seus projetos e código sempre prontos</title>
+  <link rel="stylesheet" href="/assets/local.css">
+  <script src="/assets/local.js" defer></script>
+</head>
+<body>
+  <a class="skip" href="#content">Pular para o conteúdo principal</a>
+  
+  <header>
+    <div class="brand">
+      <div class="brand-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
+        </svg>
+      </div>
+      <div class="brand-text">
+        <h1>DevSync</h1>
+        <p>Seu trabalho pronto e sincronizado no próximo computador.</p>
+      </div>
+    </div>
+    
+    <div class="header-actions">
+      <span class="badge">
+        <span class="live-beacon" aria-hidden="true"></span>
+        Daemon Local Ativo
+      </span>
+      <button id="theme-toggle" type="button" aria-label="Alternar tema claro ou escuro">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <circle cx="12" cy="12" r="5"></circle>
+          <line x1="12" y1="1" x2="12" y2="3"></line>
+          <line x1="12" y1="21" x2="12" y2="23"></line>
+          <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+          <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+          <line x1="1" y1="12" x2="3" y2="12"></line>
+          <line x1="21" y1="12" x2="23" y2="12"></line>
+          <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+          <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+        </svg>
+        <span>Tema: Escuro</span>
+      </button>
+    </div>
+  </header>
+
+  <nav aria-label="Navegação principal">
+    <button type="button" data-view="projects" aria-pressed="true">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+      Projetos
+    </button>
+    <button type="button" data-view="metrics" aria-pressed="false">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+      Estatísticas
+    </button>
+    <button type="button" data-view="setup" aria-pressed="false">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+      Configurar projeto
+    </button>
+    <button type="button" data-view="history" aria-pressed="false">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+      Histórico
+    </button>
+    <button type="button" data-view="settings" aria-pressed="false">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
+      Computador
+    </button>
+  </nav>
+
+  <p id="feedback" role="status" aria-live="polite"></p>
+
+  <main id="content" tabindex="-1">
+    <!-- View: Projetos -->
+    <div id="view-projects" class="view">
+      <div class="heading">
+        <div>
+          <h2>Seus projetos monitorados</h2>
+          <p>Sincronização contínua, status dos repositórios, detecção de divergências e regras.</p>
+        </div>
+        <div class="row">
+          <button id="sync-all" type="button" class="primary">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
+            </svg>
+            Sincronizar todos
+          </button>
+          <button type="button" data-go="setup">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <line x1="12" y1="5" x2="12" y2="19"></line>
+              <line x1="5" y1="12" x2="19" y2="12"></line>
+            </svg>
+            Adicionar projeto
+          </button>
+        </div>
+      </div>
+      <div id="projects">
+        <p class="empty">Carregando seus projetos…</p>
+      </div>
+    </div>
+
+    <!-- View: Estatísticas -->
+    <div id="view-metrics" class="view" hidden>
+      <div class="heading">
+        <div>
+          <h2>Estatísticas de Produtividade</h2>
+          <p>Métricas de sincronização, tempo economizado e atividade dos últimos 7 dias.</p>
+        </div>
+        <button id="metrics-refresh" type="button">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
+          Atualizar métricas
+        </button>
+      </div>
+
+      <div class="metrics-grid">
+        <div class="metric-card">
+          <span class="metric-label">Total de Sincronizações</span>
+          <span class="metric-value" id="metric-total-syncs">0</span>
+        </div>
+        <div class="metric-card">
+          <span class="metric-label">Taxa de Sucesso</span>
+          <span class="metric-value" id="metric-success-rate">100%</span>
+        </div>
+        <div class="metric-card">
+          <span class="metric-label">Commits Transferidos</span>
+          <span class="metric-value" id="metric-commits">0</span>
+        </div>
+        <div class="metric-card">
+          <span class="metric-label">Tempo Economizado</span>
+          <span class="metric-value" id="metric-hours">0h</span>
+        </div>
+      </div>
+
+      <section>
+        <h3>Atividade nos Últimos 7 Dias</h3>
+        <div id="metrics-chart" class="chart-container"></div>
+      </section>
+
+      <section>
+        <h3>Produtividade por Projeto</h3>
+        <div id="metrics-projects-list"></div>
+      </section>
+    </div>
+
+    <!-- View: Configurar Projeto -->
+    <div id="view-setup" class="view" hidden>
+      <div class="heading">
+        <div>
+          <h2>Configure seu projeto</h2>
+          <p>1. Escolha a pasta. 2. Verifique o Git. 3. Cadastre e sincronize.</p>
+        </div>
+      </div>
+
+      <section id="scout-section">
+        <div class="heading">
+          <div>
+            <h3>Importação em Lote & Varredura (Repo Scout)</h3>
+            <p>Importe múltiplos projetos de uma pasta raiz ou selecione pastas diretamente no computador.</p>
+          </div>
+          <div class="row">
+            <button id="scout-browse-multiple" type="button" class="primary">📁 Selecionar Várias Pastas…</button>
+          </div>
+        </div>
+        <label for="scout-root">Ou varrer uma pasta e seus subprojetos Git:</label>
+        <div class="row">
+          <input id="scout-root" placeholder="Caminho da pasta raiz (ex: C:\Programacao ou escolha ao lado)" autocomplete="off">
+          <button id="scout-browse-root" type="button" hidden>Escolher pasta raiz</button>
+          <button id="scout-scan" type="button">Varrer subpastas</button>
+        </div>
+        <div id="scout-results" class="scout-results-container"></div>
+      </section>
+
+      <section>
+        <h3>Já tenho o projeto neste computador</h3>
+        <form id="add">
+          <label for="folder">Pasta local do projeto</label>
+          <div class="row">
+            <input id="folder" required placeholder="C:\Projetos\meu-crm" autocomplete="off">
+            <button id="browse" type="button" hidden>Selecionar pasta</button>
+          </div>
+          <p class="hint">Para cadastrar pelo link do GitHub, use a clonagem abaixo.</p>
+          <div class="actions">
+            <button id="diagnose" type="button">Verificar configuração</button>
+            <button type="submit" class="primary">Cadastrar</button>
+          </div>
+        </form>
+        <div id="diagnostics" aria-live="polite"></div>
+      </section>
+
+      <section>
+        <h3>Clonar do GitHub</h3>
+        <p>O Git usa sua autenticação já configurada no sistema.</p>
+        <form id="clone">
+          <label for="repository">Link do repositório</label>
+          <input id="repository" type="url" required placeholder="https://github.com/usuario/projeto.git">
+          <label for="destination">Nova pasta de destino</label>
+          <input id="destination" required placeholder="C:\Projetos\nova-pasta">
+          <p class="hint">A pasta de destino não deve existir. O diretório pai precisa estar criado.</p>
+          <div class="actions">
+            <button type="submit" class="primary">Clonar e cadastrar</button>
+          </div>
+        </form>
+      </section>
+
+      <section>
+        <h3>Depois do cadastro</h3>
+        <p>Envio de commits e checkpoints começam desativados por segurança. Ative essas opções individualmente em cada projeto. Para acompanhar entre Casa e Trabalho, conecte cada computador na aba Computador.</p>
+        <button type="button" data-go="settings">Conectar este computador</button>
+      </section>
+    </div>
+
+    <!-- View: Histórico -->
+    <div id="view-history" class="view" hidden>
+      <div class="heading">
+        <div>
+          <h2>Histórico de sincronizações</h2>
+          <p>Resultados, commits recebidos/enviados e status das verificações.</p>
+        </div>
+        <div class="row">
+          <button id="history-catchup" type="button">🌅 Catch-Up Matinal</button>
+          <button id="history-daily" type="button">Gerar Diário no Obsidian</button>
+          <button id="history-refresh" type="button">Atualizar histórico</button>
+        </div>
+      </div>
+
+      <label for="history-project">Filtrar por projeto</label>
+      <select id="history-project">
+        <option value="">Todos os projetos</option>
+      </select>
+      <div id="history-list"></div>
+    </div>
+
+    <!-- View: Computador -->
+    <div id="view-settings" class="view" hidden>
+      <div class="heading">
+        <div>
+          <h2>Configurações deste computador</h2>
+          <p>Conexão remota, webhooks, HUD dinâmico, P2P LAN, inicialização e MCP.</p>
+        </div>
+      </div>
+
+      <section id="hud-section">
+        <h3>DevSync Dynamic HUD</h3>
+        <p>Pílula flutuante translúcida no desktop do Windows para monitoramento em tempo real.</p>
+        <button id="btn-toggle-hud" type="button">Alternar HUD Flutuante (Atalho: Ctrl+Shift+H)</button>
+      </section>
+
+      <section id="p2p-section">
+        <h3>Sincronização P2P Direta (Rede Local LAN)</h3>
+        <p id="p2p-status">DevSync descobre automaticamente instâncias na mesma rede local via UDP Beacon (Porta 48123).</p>
+        <div id="p2p-peers-list"></div>
+        <div class="actions">
+          <button id="p2p-refresh" type="button">Atualizar Computadores na Rede</button>
+        </div>
+      </section>
+
+      <section>
+        <h3>Painel Remoto & Coordenador</h3>
+        <p id="remote-status">Verificando conexão…</p>
+        <p>Gere uma conexão no painel remoto. Use um token separado para cada computador.</p>
+        <form id="remote" class="grid">
+          <div>
+            <label for="remote-url">Endereço do servidor</label>
+            <input id="remote-url" type="url" required placeholder="https://seu-servidor">
+          </div>
+          <div>
+            <label for="remote-name">Nome deste computador</label>
+            <input id="remote-name" required placeholder="Casa ou Trabalho" maxlength="80">
+          </div>
+          <div>
+            <label for="remote-id">ID do dispositivo</label>
+            <input id="remote-id" required autocomplete="off">
+          </div>
+          <div>
+            <label for="remote-token">Token do dispositivo</label>
+            <input id="remote-token" type="password" required autocomplete="off">
+          </div>
+          <div class="actions full">
+            <button type="submit" class="primary">Conectar</button>
+            <button id="test-remote" type="button">Testar servidor</button>
+            <button id="disconnect" type="button">Desconectar painel remoto</button>
+          </div>
+        </form>
+      </section>
+
+      <section>
+        <h3>Notificações Externas (Webhooks)</h3>
+        <p id="webhook-status">Nenhum webhook configurado.</p>
+        <p>Envie alertas para Discord, Telegram ou endpoint HTTP JSON quando commits forem sincronizados ou houver divergências.</p>
+        <form id="webhook" class="grid">
+          <div>
+            <label for="webhook-url">URL do webhook</label>
+            <input id="webhook-url" type="url" required placeholder="https://discord.com/api/webhooks/... ou https://...">
+          </div>
+          <div>
+            <label for="webhook-service">Serviço</label>
+            <select id="webhook-service">
+              <option value="discord">Discord</option>
+              <option value="telegram">Telegram</option>
+              <option value="generic">Genérico (JSON POST)</option>
+            </select>
+          </div>
+          <div id="webhook-chat-box" hidden class="full">
+            <label for="webhook-chat-id">Chat ID (apenas Telegram)</label>
+            <input id="webhook-chat-id" placeholder="-100123456789">
+          </div>
+          <div class="actions full">
+            <button type="submit" class="primary">Salvar webhook</button>
+            <button id="test-webhook" type="button">Testar webhook</button>
+            <button id="disconnect-webhook" type="button">Desativar webhook</button>
+          </div>
+        </form>
+      </section>
+
+      <section id="desktop-settings" hidden>
+        <h3>Inicialização com o Sistema</h3>
+        <label class="check">
+          <input type="checkbox" id="startup">
+          Iniciar com o Windows automaticamente
+        </label>
+        <p class="hint">Fechar a janela mantém o serviço em segundo plano na bandeja do sistema. Use Sair no ícone para encerrar.</p>
+      </section>
+
+      <section>
+        <h3>Atualizações do Aplicativo</h3>
+        <p id="update-state" role="status">Abra o aplicativo desktop para configurar as atualizações.</p>
+        <div id="update-controls" hidden>
+          <form id="updates">
+            <label for="update-feed">Endereço de atualizações</label>
+            <input id="update-feed" type="url" placeholder="https://seu-servidor/updates/">
+            <p class="hint">Use o endereço de versões publicado pelo responsável pelo aplicativo.</p>
+            <label class="check">
+              <input id="update-enabled" type="checkbox">
+              Verificar novas versões automaticamente
+            </label>
+            <button type="submit">Salvar preferência</button>
+          </form>
+          <div class="actions">
+            <button id="update-check" type="button">Buscar atualização</button>
+            <button id="update-download" type="button" hidden>Baixar atualização</button>
+            <button id="update-install" type="button" class="primary" hidden>Instalar e reiniciar</button>
+          </div>
+          <progress id="update-progress" max="100" value="0" hidden aria-label="Progresso do download"></progress>
+        </div>
+      </section>
+
+      <section>
+        <h3>Servidor MCP para Agentes de IA</h3>
+        <p>Conecte agentes como Claude Code, Cursor ou Antigravity diretamente ao DevSync via stdio:</p>
+        <code>node src/cli.js mcp</code>
+      </section>
+
+      <section>
+        <h3>Como protege seu trabalho</h3>
+        <p>Recebimento somente por avanço direto do histórico (fast-forward). Divergências, troca de branch e operações Git em andamento precisam de revisão manual. Arquivos ainda não salvos no editor não podem ser sincronizados.</p>
+      </section>
+    </div>
+  </main>
+
+  <!-- Modais -->
+  <dialog id="diff-modal" aria-labelledby="diff-title">
+    <div class="modal-header">
+      <h3 id="diff-title">Alterações do projeto</h3>
+      <button id="diff-close" type="button">Fechar</button>
+    </div>
+    <div id="diff-body"></div>
+  </dialog>
+
+  <dialog id="conflict-modal" class="modal-large" aria-labelledby="conflict-title">
+    <div class="modal-header">
+      <h3 id="conflict-title">Simulação & Resolução de Conflitos</h3>
+      <button id="conflict-close" type="button">Fechar</button>
+    </div>
+    <div id="conflict-body"></div>
+  </dialog>
+
+  <dialog id="secrets-modal" aria-labelledby="secrets-title">
+    <div class="modal-header">
+      <h3 id="secrets-title">Varredura de Segredos</h3>
+      <button id="secrets-close" type="button">Fechar</button>
+    </div>
+    <div id="secrets-body"></div>
+  </dialog>
+
+  <dialog id="catchup-modal" aria-labelledby="catchup-title">
+    <div class="modal-header">
+      <h3 id="catchup-title">🌅 Catch-Up Matinal & Retomada de Contexto</h3>
+      <button id="catchup-close" type="button">Fechar</button>
+    </div>
+    <div id="catchup-body"></div>
+  </dialog>
+
+  <dialog id="batch-modal" aria-labelledby="batch-title">
+    <div class="modal-header">
+      <h3 id="batch-title">📁 Importar Várias Pastas de Projetos</h3>
+      <button id="batch-close" type="button">Fechar</button>
+    </div>
+    <div id="batch-body"></div>
+  </dialog>
+
+  <footer>
+    <span>DevSync <strong id="version">0.8</strong> · Código pelo GitHub. Controle pelo seu computador.</span>
+    <span>Sincronização Segura e Inteligente</span>
+  </footer>
+</body>
+</html>
