@@ -290,7 +290,7 @@ export async function handleMcpMessage(message, deps = {}) {
         result: {
           protocolVersion: message.params?.protocolVersion || '2024-11-05',
           capabilities: { tools: {} },
-          serverInfo: { name: 'devsync-mcp', version: '0.8.0' }
+          serverInfo: { name: 'devsync-mcp', version: '0.9.0' }
         }
       };
     }
