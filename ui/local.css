@@ -898,6 +898,171 @@ dialog.modal-large {
 /* ==========================================================================
    Diff Viewer & Merge Editor
    ========================================================================== */
+.diff-summary-card {
+  background: var(--input-bg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  padding: 14px 18px;
+  margin-bottom: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.diff-summary-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.diff-summary-stats {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.diff-badge {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 3px 9px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.diff-badge-branch {
+  background: rgba(56, 189, 248, 0.12);
+  color: #38bdf8;
+  border: 1px solid rgba(56, 189, 248, 0.25);
+}
+
+.diff-badge-synced {
+  background: rgba(16, 185, 129, 0.12);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.25);
+}
+
+.diff-badge-dirty {
+  background: rgba(245, 158, 11, 0.12);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.25);
+}
+
+.diff-badge-diverged, .diff-badge-error {
+  background: rgba(244, 63, 94, 0.12);
+  color: #fb7185;
+  border: 1px solid rgba(244, 63, 94, 0.25);
+}
+
+.diff-meta-tag {
+  background: rgba(255, 255, 255, 0.04);
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line);
+}
+
+.diff-section {
+  margin: 18px 0;
+}
+
+.diff-section h4 {
+  font-size: 13.5px;
+  margin: 0 0 8px;
+  color: var(--text-bright);
+}
+
+.diff-clean-state {
+  text-align: center;
+  padding: 36px 20px;
+  background: rgba(16, 185, 129, 0.04);
+  border: 1px dashed rgba(16, 185, 129, 0.25);
+  border-radius: var(--radius-md);
+  margin: 16px 0;
+}
+
+.diff-clean-icon {
+  font-size: 32px;
+  color: #34d399;
+  margin-bottom: 10px;
+}
+
+.diff-clean-state h4 {
+  color: var(--text-bright);
+  font-size: 16px;
+  margin: 0 0 6px;
+}
+
+.diff-clean-state p {
+  color: var(--muted);
+  max-width: 480px;
+  margin: 0 auto;
+  font-size: 13.5px;
+}
+
+.diff-error-state {
+  background: rgba(244, 63, 94, 0.08);
+  border: 1px solid rgba(244, 63, 94, 0.25);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  color: #fb7185;
+}
+
+.diff-untracked-notice {
+  color: var(--muted);
+  font-style: italic;
+  font-family: inherit;
+  font-size: 13px;
+  border: 1px dashed var(--line);
+}
+
+.file-chip-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  overflow: hidden;
+}
+
+.file-status-pill {
+  font-size: 11px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text);
+}
+
+.file-status-pill.status-M {
+  background: rgba(245, 158, 11, 0.15);
+  color: #fbbf24;
+}
+
+.file-status-pill.status-A, .file-status-pill.status- {
+  background: rgba(56, 189, 248, 0.15);
+  color: #38bdf8;
+}
+
+.file-status-pill.status-D {
+  background: rgba(244, 63, 94, 0.15);
+  color: #fb7185;
+}
+
+.status-tag {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.sensitive-tag {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--danger);
+}
+
 .diff-box {
   background: #060911;
   border: 1px solid var(--line);

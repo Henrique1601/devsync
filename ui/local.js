@@ -152,33 +152,96 @@ async function openDiff(id,name){
   try{
     const d=await api('command',{command:'diff',id});
     body.replaceChildren();
-    body.append(el('p',`Branch: ${d.branch} · Estado: ${labels[d.state]||d.state} · À frente: ${d.ahead??0} · Atrás: ${d.behind??0}`));
-    if(d.commits?.length){
-      const cBox=el('div');cBox.append(el('strong','Commits divergentes/pendentes (HEAD vs Upstream):'));
-      const pre=el('div',undefined,'diff-box');
-      for(const line of d.commits)pre.append(el('span',line,'diff-line'));
-      cBox.append(pre);body.append(cBox);
+
+    // Summary Card Header
+    const summaryCard=el('div',undefined,'diff-summary-card');
+    const headerRow=el('div',undefined,'diff-summary-header');
+    
+    const branchBadge=el('span',`🌿 ${d.branch || 'HEAD'}`,'diff-badge diff-badge-branch');
+    const stateBadge=el('span',labels[d.state]||d.state,`diff-badge diff-badge-${d.state}`);
+    headerRow.append(branchBadge,stateBadge);
+
+    const statsRow=el('div',undefined,'diff-summary-stats');
+    if(d.upstream){
+      statsRow.append(el('span',`Origem: ${d.upstream}`,'diff-meta-tag'));
     }
+    statsRow.append(
+      el('span',`↑ ${d.ahead??0} à frente`,'diff-meta-tag'),
+      el('span',`↓ ${d.behind??0} atrás`,'diff-meta-tag')
+    );
+    summaryCard.append(headerRow,statsRow);
+    body.append(summaryCard);
+
+    // Commits list if ahead or behind
+    if(d.commits?.length){
+      const cBox=el('div',undefined,'diff-section');
+      const cTitle=el('h4','Commits divergentes/pendentes (HEAD vs Upstream)');
+      cBox.append(cTitle);
+      const pre=el('div',undefined,'diff-box');
+      for(const line of d.commits){
+        const isAhead=line.startsWith('>') || line.includes('>');
+        const cls=isAhead ? 'diff-line diff-add' : 'diff-line diff-del';
+        pre.append(el('span',line,cls));
+      }
+      cBox.append(pre);
+      body.append(cBox);
+    }
+
+    // Files & Changes
     if(!d.files?.length){
-      body.append(el('p','Nenhuma alteração local não commitada neste projeto.','empty'));
+      const cleanState=el('div',undefined,'diff-clean-state');
+      cleanState.innerHTML=`
+        <div class="diff-clean-icon">✓</div>
+        <h4>Nenhuma alteração local pendente</h4>
+        <p>A árvore de trabalho está totalmente limpa e rastreada. Não há arquivos modificados, excluídos ou novos sem commit.</p>
+      `;
+      body.append(cleanState);
     }else{
+      const fSection=el('div',undefined,'diff-section');
+      const fTitle=el('h4',`Arquivos alterados (${d.files.length})`);
+      fSection.append(fTitle);
+
       const list=el('div',undefined,'file-list');
       for(const f of d.files){
         const chip=el('div',undefined,'file-chip'+(f.sensitive?' file-sensitive':''));
-        chip.append(el('code',`${f.status}  ${f.path}`),el('span',f.sensitive?'Arquivo sensível (oculto)':'Modificado'));
+        const left=el('div',undefined,'file-chip-left');
+        const statusCode=f.status.trim()||'?';
+        const statusPill=el('span',statusCode,`file-status-pill status-${statusCode.replace(/[^a-zA-Z0-9]/g,'')}`);
+        left.append(statusPill,el('code',f.path));
+
+        const rightLabel=f.sensitive ? '⚠️ Arquivo sensível (oculto)' :
+                         f.status==='??' ? 'Novo arquivo (não rastreado)' :
+                         f.status==='A'  ? 'Adicionado' :
+                         f.status==='D'  ? 'Removido' :
+                         f.status==='R'  ? 'Renomeado' : 'Modificado';
+        const right=el('span',rightLabel,f.sensitive?'sensitive-tag':'status-tag');
+        chip.append(left,right);
         list.append(chip);
       }
-      body.append(list);
+      fSection.append(list);
+      body.append(fSection);
+
       if(d.diff){
+        const dSection=el('div',undefined,'diff-section');
+        dSection.append(el('h4','Diferenças de código (Unificado)'));
         const box=el('div',undefined,'diff-box');
         for(const line of d.diff.split(/\r?\n/)){
           const cls=line.startsWith('+')&&!line.startsWith('+++')?'diff-line diff-add':line.startsWith('-')&&!line.startsWith('---')?'diff-line diff-del':line.startsWith('@@')?'diff-line diff-hunk':'diff-line';
           box.append(el('span',line,cls));
         }
-        body.append(box);
+        dSection.append(box);
+        body.append(dSection);
+      } else if(d.files.every(f => f.status === '??')) {
+        const untrackedNotice=el('div',undefined,'diff-box diff-untracked-notice');
+        untrackedNotice.textContent='ℹ️ Os arquivos acima são novos e ainda não foram rastreados pelo Git (untracked). O Git só gera diff detalhado após eles serem adicionados (git add) ou commitados.';
+        body.append(untrackedNotice);
       }
     }
-  }catch(e){body.replaceChildren(el('p',e.message))}
+  }catch(e){
+    const errBox=el('div',undefined,'diff-error-state');
+    errBox.innerHTML=`<p>❌ Erro ao inspecionar o repositório:</p><pre>${e.message||e}</pre>`;
+    body.replaceChildren(errBox);
+  }
 }
 $('#diff-close')?.addEventListener('click',()=>{const m=$('#diff-modal');if(typeof m?.close==='function')m.close();else m?.setAttribute('hidden','')});
 
