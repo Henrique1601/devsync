@@ -11,7 +11,7 @@ import { scanDiff } from './secrets.js';
 import { resolveConflictAI, generateCatchUpSummary } from './ai.js';
 import { scoutRepositories, inspectScoutedRepo } from './scout.js';
 import { syncBranchWorktree } from './worktree.js';
-import { P2PManager } from './p2p.js';
+import { P2PManager, createBundle, syncFromPeerBundle } from './p2p.js';
 import { startRemote, validateRemote } from './remote-client.js';
 import { acquireServiceLock } from './service-lock.js';
 import { rulesFor, validateRules, isSyncDue } from './rules.js';
@@ -216,6 +216,16 @@ export async function daemon() {
       if (data.command === 'p2p-peers') {
         return { ok: true, peers: p2p?.getPeers() || [] };
       }
+      if (data.command === 'p2p-sync') {
+        const repo = config.projects.find(p => p.id === data.id || p.name === data.id);
+        if (!repo) throw new CommandError('Projeto não encontrado para sincronização P2P.');
+        const peers = p2p?.getPeers() || [];
+        const peer = data.peerId ? peers.find(p => p.deviceId === data.peerId || p.ip === data.peerId) : peers[0];
+        if (!peer) throw new CommandError('Nenhum peer P2P encontrado na rede local.');
+        const result = await syncFromPeerBundle(repo, peer, { branch: data.branch || repo.branch });
+        states.set(repo.id, { ...await inspect(repo), reason: 'Sincronizado diretamente via LAN com ' + (peer.name || peer.ip), checkedAt: new Date().toISOString() });
+        return { ok: true, ...result };
+      }
       if (data.command === 'clone') {
         if (typeof data.url !== 'string' || !/^https:\/\/github\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+(?:\.git)?\/?$/.test(data.url)) throw new CommandError('Informe uma URL HTTPS de repositório do GitHub, sem credenciais.');
         if (typeof data.path !== 'string' || !data.path.trim() || !path.isAbsolute(data.path.trim())) throw new CommandError('Informe o caminho absoluto da nova pasta de destino.');
@@ -365,6 +375,27 @@ export async function daemon() {
           const content = await readFile(fileURLToPath(new URL(`../ui/${name}`, import.meta.url)));
           res.writeHead(200, { 'Content-Type': name.endsWith('.js') ? 'application/javascript; charset=utf-8' : 'text/css; charset=utf-8', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' });
           return res.end(content);
+        }
+                if (req.method === 'GET' && req.url.startsWith('/api/p2p/bundle')) {
+          const auth = req.headers.authorization;
+          if (auth !== `Bearer ${token}`) return json(401, { error: 'Token P2P inválido.' });
+          const urlObj = new URL(req.url, `http://${req.headers.host || '127.0.0.1'}`);
+          const projName = urlObj.searchParams.get('project');
+          const branch = urlObj.searchParams.get('branch') || 'HEAD';
+          const repo = config.projects.find(p => p.name === projName || p.id === projName);
+          if (!repo) return json(404, { error: 'Projeto não encontrado neste peer.' });
+          const os = await import('node:os');
+          const tempBundle = path.join(os.tmpdir(), `bundle-${repo.id}-${Date.now()}.bundle`);
+          try {
+            await createBundle(repo.path, tempBundle, branch);
+            const bundleData = await readFile(tempBundle);
+            res.writeHead(200, { 'Content-Type': 'application/octet-stream', 'Content-Disposition': `attachment; filename="${repo.name || 'sync'}.bundle"` });
+            return res.end(bundleData);
+          } catch (bErr) {
+            return json(500, { error: 'Falha ao gerar bundle: ' + bErr.message });
+          } finally {
+            await rm(tempBundle, { force: true }).catch(() => {});
+          }
         }
         if (req.headers.authorization !== `Bearer ${token}`) return json(401, { error: 'Token inválido.' });
         if (req.method === 'GET' && req.url === '/api/status') return json(200, {

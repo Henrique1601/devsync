@@ -609,6 +609,12 @@
       if (window.devsyncDesktop?.closeHud) window.devsyncDesktop.closeHud();
     };
 
+    if (window.devsyncDesktop?.onOpenSpotlight) {
+      window.devsyncDesktop.onOpenSpotlight(() => {
+        openPalette();
+      });
+    }
+
     updateStatus();
     setInterval(updateStatus, 3000);
   </script>

@@ -535,8 +535,25 @@ async function loadP2pPeers(){
     if(!res.peers?.length){host.append(el('p','Nenhum outro computador DevSync detectado na rede local no momento.','empty'));return}
     for(const p of res.peers){
       const c=el('div',undefined,'p2p-peer-card');
-      c.append(el('strong',p.device||p.address));
-      c.append(el('span',`${p.address}:${p.port||48123} · Visto: ${time(p.lastSeen)}`,'hint'));
+      const info=el('div');
+      info.append(el('strong',p.name||p.deviceId||p.ip),el('p',`${p.ip}:${p.httpPort||48123} · Latência: ${p.latency||0}ms`,'hint'));
+      const actions=el('div',undefined,'actions');
+      const syncBtn=el('button','Sincronizar via LAN','primary');
+      syncBtn.type='button';
+      syncBtn.onclick=async()=>{
+        syncBtn.disabled=true;
+        try{
+          notice('Sincronizando via rede local com '+ (p.name || p.ip) +'…');
+          const statusRes=await api('status');
+          const firstProject=statusRes.projects?.[0];
+          if(!firstProject) throw new Error('Cadastre ao menos um projeto para sincronizar.');
+          await api('command',{command:'p2p-sync',id:firstProject.id,peerId:p.deviceId});
+          notice('Sincronização P2P concluída com sucesso!');
+          await refresh();
+        }catch(err){notice('Falha P2P: '+err.message)}finally{syncBtn.disabled=false}
+      };
+      actions.append(syncBtn);
+      c.append(info,actions);
       host.append(c);
     }
   }catch(e){host.replaceChildren(el('p','P2P: '+e.message,'hint'))}

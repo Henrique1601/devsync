@@ -40,6 +40,20 @@ async function show() { if (window) { window.show(); window.focus(); return; }
   window.on('closed', () => { window = null; });
   await window.loadURL(`http://127.0.0.1:${runtime.port}/#${runtime.token}`);
 }
+async function showSpotlight() {
+  if (hudWindow) {
+    hudWindow.show();
+    hudWindow.focus();
+    hudWindow.webContents.send('open-spotlight');
+    return;
+  }
+  await showHud();
+  if (hudWindow) {
+    hudWindow.webContents.once('did-finish-load', () => {
+      hudWindow.webContents.send('open-spotlight');
+    });
+  }
+}
 async function showHud() {
   if (hudWindow) { hudWindow.show(); hudWindow.focus(); return; }
   hudWindow = new BrowserWindow({
@@ -146,7 +160,7 @@ else {
           toggleHud();
         });
       } catch {}
-      tray.setContextMenu(Menu.buildFromTemplate([{label:'Abrir DevSync (Ctrl+Shift+D)',click:show},{label:'Alternar Mini-HUD (Ctrl+Shift+H)',click:toggleHud},{label:'Sincronizar todos (Ctrl+Shift+S)',click:syncAllFromTray},{type:'separator'},{label:'Sair',click:()=>app.quit()}]));tray.on('double-click',show);
+      tray.setContextMenu(Menu.buildFromTemplate([{label:'Abrir DevSync (Ctrl+Shift+D)',click:show},{label:'Alternar Mini-HUD (Ctrl+Shift+H)',click:toggleHud},{label:'Spotlight / Command Palette (Ctrl+K)',click:showSpotlight},{label:'Sincronizar todos (Ctrl+Shift+S)',click:syncAllFromTray},{type:'separator'},{label:'Sair',click:()=>app.quit()}]));tray.on('double-click',show);
       const last = new Map(); let checking=false;
       pollTimer=setInterval(async()=>{if(checking)return;checking=true;try{const r=await fetch(`http://127.0.0.1:${runtime.port}/api/status`,{headers:{authorization:`Bearer ${runtime.token}`},signal:AbortSignal.timeout(5000)});if(!r.ok)return;const {projects}=await r.json();for(const p of projects){const previous=last.get(p.id);last.set(p.id,p.state);if(previous&&previous!==p.state&&['error','dirty','diverged','synced'].includes(p.state)&&Notification.isSupported())new Notification({title:'DevSync: '+p.name,body:p.state==='synced'?'Projeto sincronizado.':'O projeto precisa de atenção. Abra o DevSync para ver os detalhes.'}).show()}}catch{}finally{checking=false}},10000);
       if (!process.argv.includes('--background')) await show();

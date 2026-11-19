@@ -14,5 +14,8 @@ contextBridge.exposeInMainWorld('devsyncDesktop', {
   toggleHud: () => ipcRenderer.invoke('toggle-hud'),
   setHudSize: (width, height) => ipcRenderer.invoke('set-hud-size', width, height),
   openInEditor: folderPath => ipcRenderer.invoke('open-in-editor', folderPath),
-  openExternal: url => ipcRenderer.invoke('open-external', url)
+  openExternal: url => ipcRenderer.invoke('open-external', url),
+  onOpenSpotlight: callback => {
+    ipcRenderer.on('open-spotlight', () => callback());
+  }
 });
